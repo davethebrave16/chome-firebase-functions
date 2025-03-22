@@ -6,6 +6,7 @@ from firebase_functions import https_fn
 from firebase_admin import initialize_app
 from reservations import send_reservation_confirmation
 from events import duplicate_event_associations
+from auth import verify_token
 
 app = initialize_app()
 
@@ -18,6 +19,8 @@ def on_complete_reservation(req: https_fn.Request) -> https_fn.Response:
 
 @https_fn.on_request(region=region)
 def on_event_duplicate(req: https_fn.Request) -> https_fn.Response:
+    if not verify_token(req):
+        return https_fn.Response("Unauthorized", 401)
     new_event_id = req.args.get("new_event_id")
     old_event_id = req.args.get("old_event_id")
     return duplicate_event_associations(new_event_id, old_event_id)

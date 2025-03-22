@@ -19,7 +19,7 @@ def duplicate_event_associations(new_event_id: str, old_event_id: str) -> https_
     old_questions = list(db.collection("event_survey_question").where("event", "==", old_event_ref).stream())
     print('Questions found:', len(old_questions))
 
-    for question in old_questions:
+    '''for question in old_questions:
         data = question.to_dict()
         print('Duplicating question: ' + question.id + ' with text ' + data["questionText"])
         data["event"] = new_event_ref
@@ -28,7 +28,7 @@ def duplicate_event_associations(new_event_id: str, old_event_id: str) -> https_
         if question_ref.get().exists:
             print('Question duplicated with id ' + question_ref.id)
         else:
-            print('Question not duplicated')
+            print('Question not duplicated')'''
         
 
     return https_fn.Response("OK", 200)
