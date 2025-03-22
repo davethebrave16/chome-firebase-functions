@@ -1,3 +1,5 @@
+import os
+from sqlite3.dbapi2 import Timestamp
 from firebase_functions import https_fn
 from google.cloud import firestore
 from google.cloud.firestore_v1.document import DocumentReference
@@ -45,4 +47,15 @@ def check_reservation_expiration(reservation_id: str) -> https_fn.Response:
         doc_ref.delete()
         return https_fn.Response("Reservation deleted", 200)
     
-    return https_fn.Response("Reservation not confirmed", 400)
+    print ("Reservation " + reservation_id + " created at: " + str(res_data.get("createdAt")))
+    res_timestamp = res_data.get("createdAt").timestamp()
+    current_timestamp = Timestamp.now().timestamp()
+
+    res_exp_time = os.environ.get("RESERVATION_EXP_TIME")
+    if current_timestamp - res_timestamp > int(res_exp_time):
+        print ("Reservation " + reservation_id + " expired. Deleting...")
+        doc_ref.delete()
+        return https_fn.Response("Reservation deleted", 200)
+
+    
+    return https_fn.Response("Reservation still valid", 200)

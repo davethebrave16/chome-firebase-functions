@@ -5,14 +5,13 @@ meta {
 }
 
 get {
-  url: {{host}}/on_event_duplicate?old_event_id={{oldEventId}}&new_event_id={{newEventId}}
+  url: {{host}}/verify_reservation_expiration?res_id=YtahOq7u5jQsusdR5oLX
   body: none
   auth: none
 }
 
 params:query {
-  old_event_id: {{oldEventId}}
-  new_event_id: {{newEventId}}
+  res_id: YtahOq7u5jQsusdR5oLX
 }
 
 headers {

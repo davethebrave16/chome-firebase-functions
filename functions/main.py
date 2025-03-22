@@ -11,7 +11,7 @@ from firebase_functions.firestore_fn import (
 )
 from firebase_admin import initialize_app
 from google.cloud import firestore
-from reservations import send_reservation_confirmation
+from reservations import check_reservation_expiration, send_reservation_confirmation
 from events import duplicate_event_associations, delete_event_associations
 from auth import verify_token
 
@@ -48,3 +48,10 @@ def on_event_delete(event: Event[DocumentSnapshot|None]) -> https_fn.Response:
     doc_ref = event.data.reference
     doc_data = event.data.to_dict()
     return delete_event_associations(doc_ref, doc_data)
+
+@https_fn.on_request(region=region)
+def verify_reservation_expiration(req: https_fn.Request) -> https_fn.Response:
+    if not verify_token(req):
+        return https_fn.Response("Unauthorized", 401)
+    res_id = req.args.get("res_id")
+    return check_reservation_expiration(res_id)
