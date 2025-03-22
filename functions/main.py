@@ -6,7 +6,9 @@ from firebase_functions import https_fn
 from firebase_functions.firestore_fn import (
   on_document_deleted,
   on_document_created,
+  on_document_updated,
   Event,
+  Change,
   DocumentSnapshot,
 )
 from firebase_admin import initialize_app
@@ -18,11 +20,6 @@ from auth import verify_token
 app = initialize_app()
 
 region = 'europe-west1'
-
-@https_fn.on_request(region=region)
-def on_complete_reservation(req: https_fn.Request) -> https_fn.Response:
-    res_id = req.args.get("res_id")
-    return send_reservation_confirmation()
 
 @on_document_created(document='event/{event_id}', region=region)
 def on_event_created(event: Event[DocumentSnapshot|None]) -> https_fn.Response:
@@ -48,3 +45,14 @@ def on_event_delete(event: Event[DocumentSnapshot|None]) -> https_fn.Response:
     doc_ref = event.data.reference
     doc_data = event.data.to_dict()
     return delete_event_associations(doc_ref, doc_data)
+
+@on_document_updated(document='event_reservation/{reservation_id}', region=region)
+def on_reservation_update(event: Event[Change[DocumentSnapshot]]) -> https_fn.Response:
+    doc_ref = event.data.after.reference
+    doc_data_before = event.data.before.to_dict()
+    doc_data_after = event.data.after.to_dict()
+    print ("Reservation updated " + doc_ref.id)
+    if ("confirmed" not in doc_data_before or doc_data_before["confirmed"] == False or doc_data_before["confirmed"] is None) and ("confirmed" in doc_data_after and doc_data_after["confirmed"] == True):
+        return send_reservation_confirmation(doc_ref)
+    print ("No actions done!")
+    return https_fn.Response("No actions done!", 204)
