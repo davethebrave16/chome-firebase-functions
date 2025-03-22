@@ -23,15 +23,6 @@ region = 'europe-west1'
 def on_complete_reservation(req: https_fn.Request) -> https_fn.Response:
     res_id = req.args.get("res_id")
     return send_reservation_confirmation()
-'''
-@https_fn.on_request(region=region)
-def on_event_duplicate(req: https_fn.Request) -> https_fn.Response:
-    if not verify_token(req):
-        return https_fn.Response("Unauthorized", 401)
-    new_event_id = req.args.get("new_event_id")
-    old_event_id = req.args.get("old_event_id")
-    return duplicate_event_associations(new_event_id, old_event_id)
-'''
 
 @on_document_created(document='event/{event_id}', region=region)
 def on_event_created(event: Event[DocumentSnapshot|None]) -> https_fn.Response:
