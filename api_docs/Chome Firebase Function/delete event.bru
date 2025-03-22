@@ -1,0 +1,19 @@
+meta {
+  name: delete event
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{host}}/on_event_delete?event_id={{deleteEventId}}
+  body: none
+  auth: none
+}
+
+params:query {
+  event_id: {{deleteEventId}}
+}
+
+headers {
+  Authorization: {{token}}
+}

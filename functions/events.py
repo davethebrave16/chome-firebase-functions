@@ -32,3 +32,23 @@ def duplicate_event_associations(new_event_id: str, old_event_id: str) -> https_
         
 
     return https_fn.Response("OK", 200)
+
+def test_delete_event_associations(event_id: str):
+    if event_id is None:
+        return https_fn.Response("Missing event id", 400)
+    
+    db = firestore.Client()
+    event_ref = db.collection("event").document(event_id)
+    if not event_ref.get().exists:
+        return https_fn.Response("Event not found", 404)
+    questions = list(db.collection("event_survey_question").where("event", "==", event_ref).stream())
+    print('Questions found:', len(questions))
+    for question in questions:
+        print('Deleting question: ' + question.id + ' with text ' + question.to_dict()["questionText"])
+        question_ref = question.reference
+        question_ref.delete()
+        if not question_ref.get().exists:
+            print('Question deleted')
+        else:
+            print('Question not deleted')
+    return https_fn.Response("OK", 200)
