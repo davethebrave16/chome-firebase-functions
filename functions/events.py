@@ -33,14 +33,28 @@ def duplicate_event_associations(new_event_id: str, old_event_id: str) -> https_
 
     return https_fn.Response("OK", 200)
 
+def delete_event_associations(event_ref, event_data) -> https_fn.Response:
+    if event_ref is None:
+        return https_fn.Response("Missing event ref", 400)
+    print ('Triggered deleting event associations from ' + event_ref.id + ' with title ' + event_data["name"])
+    if not get_questions_and_delete_from_event_ref(event_ref, event_ref):
+        return https_fn.Response("Error deleting questions", 400)
+
+    return https_fn.Response("OK", 200)
+
 def test_delete_event_associations(event_id: str):
     if event_id is None:
         return https_fn.Response("Missing event id", 400)
-    
+    print ('Deleting event associations from ' + event_id)
     db = firestore.Client()
     event_ref = db.collection("event").document(event_id)
     if not event_ref.get().exists:
         return https_fn.Response("Event not found", 404)
+    if not get_questions_and_delete_from_event_ref(db, event_ref):
+        return https_fn.Response("Error deleting questions", 400)
+    return https_fn.Response("OK", 200)
+
+def get_questions_and_delete_from_event_ref(db, event_ref) -> bool:
     questions = list(db.collection("event_survey_question").where("event", "==", event_ref).stream())
     print('Questions found:', len(questions))
     for question in questions:
@@ -51,4 +65,5 @@ def test_delete_event_associations(event_id: str):
             print('Question deleted')
         else:
             print('Question not deleted')
-    return https_fn.Response("OK", 200)
+
+    return True

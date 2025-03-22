@@ -2,10 +2,15 @@
 # To get started, simply uncomment the below code or create your own.
 # Deploy with `firebase deploy`
 
-from firebase_functions import https_fn, firestore_fn
+from firebase_functions import https_fn
+from firebase_functions.firestore_fn import (
+  on_document_deleted,
+  Event,
+  DocumentSnapshot,
+)
 from firebase_admin import initialize_app
 from reservations import send_reservation_confirmation
-from events import test_delete_event_associations, duplicate_event_associations
+from events import test_delete_event_associations, duplicate_event_associations, delete_event_associations
 from auth import verify_token
 
 app = initialize_app()
@@ -25,9 +30,11 @@ def on_event_duplicate(req: https_fn.Request) -> https_fn.Response:
     old_event_id = req.args.get("old_event_id")
     return duplicate_event_associations(new_event_id, old_event_id)
 
-@firestore_fn.on_document_deleted(document='event/{event_id}', region=region)
-def on_event_delete_trigger(event_id: str) -> https_fn.Response:
-    return test_delete_event_associations(event_id)
+@on_document_deleted(document='event/{event_id}', region=region)
+def on_event_delete_trigger(event: Event[DocumentSnapshot|None]) -> https_fn.Response:
+    doc_ref = event.data.reference
+    doc_data = event.data.to_dict()
+    return delete_event_associations(doc_ref, doc_data)
 
 @https_fn.on_request(region=region)
 def on_event_delete(req: https_fn.Request) -> https_fn.Response:
