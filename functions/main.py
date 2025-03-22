@@ -5,10 +5,12 @@
 from firebase_functions import https_fn
 from firebase_functions.firestore_fn import (
   on_document_deleted,
+  on_document_created,
   Event,
   DocumentSnapshot,
 )
 from firebase_admin import initialize_app
+from google.cloud import firestore
 from reservations import send_reservation_confirmation
 from events import duplicate_event_associations, delete_event_associations
 from auth import verify_token
@@ -21,7 +23,7 @@ region = 'europe-west1'
 def on_complete_reservation(req: https_fn.Request) -> https_fn.Response:
     res_id = req.args.get("res_id")
     return send_reservation_confirmation()
-
+'''
 @https_fn.on_request(region=region)
 def on_event_duplicate(req: https_fn.Request) -> https_fn.Response:
     if not verify_token(req):
@@ -29,6 +31,26 @@ def on_event_duplicate(req: https_fn.Request) -> https_fn.Response:
     new_event_id = req.args.get("new_event_id")
     old_event_id = req.args.get("old_event_id")
     return duplicate_event_associations(new_event_id, old_event_id)
+'''
+
+@on_document_created(document='event/{event_id}', region=region)
+def on_event_created(event: Event[DocumentSnapshot|None]) -> https_fn.Response:
+    doc_ref = event.data.reference
+    if doc_ref is None:
+        return https_fn.Response("Missing event ref", 400)
+    doc_data = event.data.to_dict()
+    print ("Event created " + doc_ref.id + " with title " + doc_data["name"])
+    if "duplicateFrom" in doc_data and doc_data["duplicateFrom"] is not None:
+        '''
+        if doc_data["duplicateFrom"] == "":
+            print("Event duplication from default")
+            db = firestore.Client()
+            doc_data["duplicateFrom"] = db.collection("event").document("XzqGBxWFyiXUGoFpcS2u").get().reference'
+        '''
+        print("Event duplication")
+        return duplicate_event_associations(doc_data["duplicateFrom"], doc_ref)
+    print ("No actions done!")
+    return https_fn.Response("No actions done!", 204)
 
 @on_document_deleted(document='event/{event_id}', region=region)
 def on_event_delete(event: Event[DocumentSnapshot|None]) -> https_fn.Response:
