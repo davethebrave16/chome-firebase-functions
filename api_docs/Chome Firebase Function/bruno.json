@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "Chome Firebase Function",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

@@ -1,0 +1,16 @@
+meta {
+  name: duplicate event
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{host}}/on_event_duplicate?old_event_id={{oldEventId}}&new_event_id={{newEventId}}
+  body: none
+  auth: none
+}
+
+params:query {
+  old_event_id: {{oldEventId}}
+  new_event_id: {{newEventId}}
+}
