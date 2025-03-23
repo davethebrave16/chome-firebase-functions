@@ -73,6 +73,21 @@ def delete_event_associations(event_ref, event_data) -> https_fn.Response:
         else:
             print('Question not deleted')
 
+    medias = list(db.collection("event_media").where("event", "==", event_ref).stream())
+    print('Medias found:', len(medias))
+    for media in medias:
+        print('Deleting media: ' + media.id + ' with path ' + media.to_dict()["path"])
+        if delete_media(media.to_dict()["path"]):
+            print('Media deleted')
+        else:
+            print('Media not deleted. Passing to next one...')
+        media_ref = media.reference
+        media_ref.delete()
+        if not media_ref.get().exists:
+            print('Event media deleted')
+        else:
+            print('Event media not deleted')
+
     return https_fn.Response("OK", 200)
 
 def duplicate_media(path: str) -> str:
@@ -97,6 +112,19 @@ def duplicate_media(path: str) -> str:
     print ("Media duplicated with url " + new_url)
 
     return new_url
+
+def delete_media(path: str) -> bool:
+    bucket = storage.bucket()
+    print('Public path ' + path)
+    bucket_path = extract_file_path(path)
+    print('Bucket path ' + bucket_path)
+    try:
+        blob = bucket.blob(bucket_path)
+        blob.delete()
+        return True
+    except Exception as e:
+        print("Error deleting media: " + str(e))
+        return False
 
 def extract_file_path(url):
     parsed_url = urlparse(url)
