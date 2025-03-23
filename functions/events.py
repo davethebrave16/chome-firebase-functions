@@ -2,6 +2,9 @@ from firebase_functions import https_fn
 
 from google.cloud import firestore
 from google.cloud.firestore_v1.document import DocumentReference
+from firebase_admin import storage
+from urllib.parse import urlparse, unquote
+import os, uuid
 
 def duplicate_event_associations(old_event_ref: DocumentReference, new_event_ref: DocumentReference) -> https_fn.Response:
     if old_event_ref is None or new_event_ref is None:
@@ -29,6 +32,25 @@ def duplicate_event_associations(old_event_ref: DocumentReference, new_event_ref
             print('Question duplicated with id ' + question_ref.id)
         else:
             print('Question not duplicated')
+
+    old_medias = list(db.collection("event_media").where("event", "==", old_event_ref).stream())
+    print('Medias found:', len(old_medias))
+
+    for media in old_medias:
+        data = media.to_dict()
+        print('Duplicating media: ' + media.id + ' with path ' + data["path"])
+        new_media_path = duplicate_media(data["path"])
+        if new_media_path is None:
+            print('Error duplicating media. ' + media.id + ' Passing to next one...')
+            continue
+        data["path"] = new_media_path
+        data["event"] = new_event_ref
+        media_ref = db.collection("event_media").document()
+        media_ref.set(data)
+        if media_ref.get().exists:
+            print('Media duplicated with id ' + media_ref.id)
+        else:
+            print('Media not duplicated')
         
 
     return https_fn.Response("OK", 200)
@@ -52,3 +74,41 @@ def delete_event_associations(event_ref, event_data) -> https_fn.Response:
             print('Question not deleted')
 
     return https_fn.Response("OK", 200)
+
+def duplicate_media(path: str) -> str:
+    bucket = storage.bucket()
+    print('Public path ' + path)
+    bucket_path = extract_file_path(path)
+    print('Bucket path ' + bucket_path)
+    folder_path = extract_folder_path(bucket_path)
+    print('Folder path ' + folder_path)
+
+    new_file_path = folder_path + '/duplicated/' + uuid.uuid4().hex + '/' + extract_filename(bucket_path)
+    try:
+        blob = bucket.blob(bucket_path)
+        file_contents = blob.download_as_bytes()
+        new_blob = bucket.blob(new_file_path)
+        new_blob.upload_from_string(file_contents)
+        new_url = new_blob.generate_signed_url(expiration=3600 * 24 * 7 * 30 * 12 * 50)  # 50 years
+    except Exception as e:
+        print("Error duplicating media: " + str(e))
+        return None
+        
+    print ("Media duplicated with url " + new_url)
+
+    return new_url
+
+def extract_file_path(url):
+    parsed_url = urlparse(url)
+    path_with_encoded_slashes = parsed_url.path.split('/o/')[1]
+    file_path = unquote(path_with_encoded_slashes)
+
+    return file_path.split('?')[0]
+
+def extract_folder_path(file_path):
+    folder_path = os.path.dirname(file_path)
+    return folder_path
+
+def extract_filename(file_path):
+    filename = os.path.basename(file_path)
+    return filename

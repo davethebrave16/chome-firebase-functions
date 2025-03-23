@@ -36,7 +36,7 @@ def on_event_created(event: Event[DocumentSnapshot|None]) -> https_fn.Response:
         if doc_data["duplicateFrom"] == "":
             print("Event duplication from default")
             db = firestore.Client()
-            doc_data["duplicateFrom"] = db.collection("event").document("XzqGBxWFyiXUGoFpcS2u").get().reference'
+            doc_data["duplicateFrom"] = db.collection("event").document("XnTJDgRrNGa2OOb6kJMD").get().reference
         '''
         print("Event duplication")
         return duplicate_event_associations(doc_data["duplicateFrom"], doc_ref)
