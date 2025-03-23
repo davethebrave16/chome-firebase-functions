@@ -11,7 +11,7 @@ from firebase_functions.firestore_fn import (
 )
 from firebase_admin import initialize_app
 from google.cloud import firestore
-from reservations import check_reservation_expiration, send_reservation_confirmation
+from reservations import check_reservation_expiration, schedule_reservation_expiration_check, send_reservation_confirmation
 from events import duplicate_event_associations, delete_event_associations
 from auth import verify_token
 
@@ -55,3 +55,10 @@ def verify_reservation_expiration(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response("Unauthorized", 401)
     res_id = req.args.get("res_id")
     return check_reservation_expiration(res_id)
+
+@on_document_created(document='event_reservation/{res_id}', region=region)
+def on_reservation_created(event: Event[DocumentSnapshot|None]) -> https_fn.Response:
+    doc_ref = event.data.reference
+    doc_data = event.data.to_dict()
+    print ("Reservation created " + doc_ref.id + " with title " + doc_data["name"])
+    return schedule_reservation_expiration_check(doc_ref.id)
