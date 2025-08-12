@@ -6,6 +6,7 @@ A Firebase Cloud Functions project built with Python that provides backend servi
 
 - **Event Management**: Create, duplicate, and delete events with automatic association handling
 - **Reservation System**: Handle event reservations with expiration checks and confirmations
+- **Email Notifications**: Automatic email confirmations using Brevo SMTP API
 - **Authentication**: Token verification for secure API endpoints
 - **Cloud Tasks Integration**: Scheduled tasks for reservation expiration management
 - **Firestore Triggers**: Automatic document change handling
@@ -19,6 +20,7 @@ chome-firebase-functions/
 │   ├── auth.py              # Authentication utilities
 │   ├── events.py            # Event management functions
 │   ├── reservations.py      # Reservation handling functions
+│   ├── email_service.py     # Centralized email service (Brevo)
 │   └── requirements.txt     # Python dependencies
 ├── api_docs/                # API documentation (Bruno)
 ├── firebase.json            # Firebase configuration
@@ -33,6 +35,8 @@ chome-firebase-functions/
 - Firebase CLI
 - Google Cloud SDK
 - Firebase project with Firestore and Storage enabled
+- Brevo account with SMTP API access
+- Domain verification (for custom sender emails)
 
 ## 📦 Installation
 
@@ -93,9 +97,9 @@ The project includes Bruno API documentation for testing endpoints:
 
 ### HTTP Functions
 
-- **`on_complete_reservation`** - Complete a reservation
-  - Method: GET
-  - Query params: `res_id`
+- **`on_reservation_confirmed`** - Triggered when a reservation is confirmed
+  - Document path: `event_reservation/{res_id}`
+  - Trigger: When `confirmed` field changes to `true`
   - Region: `europe-west1`
 
 - **`verify_reservation_expiration`** - Check reservation expiration
@@ -117,6 +121,59 @@ The project includes Bruno API documentation for testing endpoints:
 - **`on_reservation_created`** - Triggered when a reservation is created
   - Document path: `event_reservation/{res_id}`
   - Schedules expiration checks
+
+## 📧 Email Service
+
+### Overview
+The project includes a centralized email service using Brevo SMTP API for sending automatic email notifications. The service is primarily used for sending reservation confirmation emails when a reservation is marked as confirmed.
+
+### Features
+- **Centralized Service**: Single `email_service.py` file handling all email operations
+- **Brevo Integration**: Uses Brevo SMTP API for reliable email delivery
+- **Professional Templates**: Beautiful HTML and plain text email templates
+- **Automatic Triggering**: Emails are sent automatically when reservations are confirmed
+- **Error Handling**: Comprehensive error handling and logging
+
+### How It Works
+1. **Trigger**: When an `event_reservation` document is updated and the `confirmed` field changes from `false/undefined` to `true`
+2. **Data Collection**: The service gathers reservation, user, and event information from Firestore
+3. **Email Generation**: Creates professional HTML and plain text email content
+4. **Delivery**: Sends the email via Brevo SMTP API
+5. **Logging**: Provides detailed logging for debugging and monitoring
+
+### Email Content
+The confirmation emails include:
+- **Event Details**: Name, date, and address
+- **Reservation Information**: Reservation ID and confirmation status
+- **Professional Design**: Responsive HTML template with fallback plain text
+- **Branding**: Customizable sender name and email address
+
+### Configuration Required
+```bash
+# Brevo Email Service Configuration
+BREVO_SMTP_API_KEY=your_brevo_smtp_api_key
+BREVO_SMTP_BASE_URL=https://api.brevo.com/v3
+SENDER_EMAIL=your_verified_email@domain.com
+SENDER_NAME=Chome System
+```
+
+### Domain Verification
+**Important**: Before using custom sender domains (e.g., `noreply@yourdomain.com`), you must verify your domain in Brevo:
+1. Go to Brevo Dashboard → Senders & IP → Senders
+2. Add your domain and follow the verification process
+3. Add the provided DNS records to your domain
+4. Wait for verification (can take 24-48 hours)
+
+### Testing
+Test the email service by updating a reservation document:
+```javascript
+// In your frontend or admin panel
+await updateDoc(doc(db, 'event_reservation', 'reservation_id'), {
+  confirmed: true
+});
+
+// The confirmation email will be sent automatically!
+```
 
 ## 🚀 Deployment
 
