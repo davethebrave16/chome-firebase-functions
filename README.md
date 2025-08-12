@@ -122,6 +122,11 @@ The project includes Bruno API documentation for testing endpoints:
   - Document path: `event_reservation/{res_id}`
   - Schedules expiration checks
 
+- **`on_user_created`** - Triggered when a user document is created
+  - Document path: `user/{user_id}`
+  - Automatically manages name field consistency
+  - Creates missing firstName/lastName from display_name or vice versa
+
 ## 📧 Email Service
 
 ### Overview

@@ -90,3 +90,67 @@ def on_reservation_created(event: Event[DocumentSnapshot|None]) -> https_fn.Resp
     print(f"Event reference: {doc_data.get('event', 'No event reference')}")
     print(f"User reference: {doc_data.get('user', 'No user reference')}")
     return schedule_reservation_expiration_check(doc_ref.id)
+
+@on_document_created(document='user/{user_id}', region=region)
+def on_user_created(event: Event[DocumentSnapshot|None]) -> https_fn.Response:
+    doc_ref = event.data.reference
+    if doc_ref is None:
+        return https_fn.Response("Missing user document reference", 400)
+    
+    doc_data = event.data.to_dict()
+    if doc_data is None:
+        return https_fn.Response("Missing user document data", 400)
+    
+    print(f"User created {doc_ref.id}")
+    print(f"User data: {doc_data}")
+    
+    # Get current field values
+    display_name = doc_data.get('display_name')
+    first_name = doc_data.get('firstName')
+    last_name = doc_data.get('lastName')
+    
+    updates = {}
+    
+    # Case 1: display_name is present but firstName/lastName are not
+    if display_name and not first_name and not last_name:
+        print(f"Creating firstName and lastName from display_name: {display_name}")
+        name_parts = display_name.strip().split(' ', 1)  # Split on first space only
+        
+        if len(name_parts) >= 2:
+            updates['firstName'] = name_parts[0].strip()
+            updates['lastName'] = name_parts[1].strip()
+            print(f"Split into firstName: '{updates['firstName']}', lastName: '{updates['lastName']}'")
+        else:
+            # Single name, use as firstName
+            updates['firstName'] = name_parts[0].strip()
+            print(f"Single name, using as firstName: '{updates['firstName']}'")
+    
+    # Case 2: firstName and lastName are present but display_name is not
+    elif first_name and last_name and not display_name:
+        print(f"Creating display_name from firstName and lastName: {first_name} {last_name}")
+        updates['display_name'] = f"{first_name.strip()} {last_name.strip()}"
+        print(f"Created display_name: '{updates['display_name']}'")
+    
+    # Case 3: All fields are present, no action needed
+    elif display_name and first_name and last_name:
+        print("All name fields are present, no updates needed")
+        return https_fn.Response("User name fields are complete", 200)
+    
+    # Case 4: No name fields present, no action possible
+    elif not display_name and not first_name and not last_name:
+        print("No name fields present, cannot create missing fields")
+        return https_fn.Response("No name fields present", 200)
+    
+    # Apply updates if any
+    if updates:
+        try:
+            db = firestore.Client()
+            doc_ref.update(updates)
+            print(f"Successfully updated user {doc_ref.id} with: {updates}")
+            return https_fn.Response(f"User updated with: {updates}", 200)
+        except Exception as e:
+            error_msg = f"Error updating user {doc_ref.id}: {str(e)}"
+            print(error_msg)
+            return https_fn.Response(error_msg, 500)
+    
+    return https_fn.Response("No updates needed", 200)
