@@ -1,0 +1,112 @@
+name: Deploy Firebase Functions
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/master' && 'prod' || 'staging' }}
+
+    steps:
+      # 1. Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      # 3. Create virtual environment
+      - name: Create virtual environment
+        working-directory: ./functions
+        run: python -m venv venv
+
+      # 4. Install dependencies
+      - name: Install dependencies
+        working-directory: ./functions
+        run: |
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      # 5. Create .env file from GitHub Secrets
+      - name: Create .env file
+        working-directory: ./functions
+        run: |
+          echo "SECRET=${{ secrets.SECRET }}" >> .env
+          echo "RESERVATION_EXP_TIME=${{ vars.RESERVATION_EXP_TIME }}" >> .env
+          echo "RESERVATION_EXP_CHECK_URL=${{ secrets.RESERVATION_EXP_CHECK_URL }}" >> .env
+          echo "GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" >> .env
+          echo "TASK_QUEUE_NAME=${{ vars.TASK_QUEUE_NAME }}" >> .env
+          echo "TASK_QUEUE_REGION=${{ vars.TASK_QUEUE_REGION }}" >> .env
+          echo "TASK_SCHEDULE_DELAY=${{ vars.TASK_SCHEDULE_DELAY }}" >> .env
+          echo "STORAGE_BUCKET=${{ secrets.STORAGE_BUCKET }}" >> .env
+          echo "BREVO_SMTP_API_KEY=${{ secrets.BREVO_SMTP_API_KEY }}" >> .env
+          echo "BREVO_SMTP_BASE_URL=${{ vars.BREVO_SMTP_BASE_URL }}" >> .env
+          echo "BREVO_SMTP_SENDER_EMAIL=${{ vars.BREVO_SMTP_SENDER_EMAIL }}" >> .env
+          echo "BREVO_SMTP_SENDER_NAME=${{ vars.BREVO_SMTP_SENDER_NAME }}" >> .env
+
+      # 6. Run tests
+      - name: Run tests
+        working-directory: ./functions
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          pytest tests/ -v
+
+      # 7. Run tests with coverage
+      - name: Run tests with coverage
+        working-directory: ./functions
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          pytest tests/ --cov=src --cov-report=xml --cov-report=term
+
+      # 8. Install Firebase CLI
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      # 9. Ensure virtual environment is ready for Firebase
+      - name: Prepare virtual environment for deployment
+        working-directory: ./functions
+        run: |
+          source venv/bin/activate
+          pip install -r requirements.txt
+          echo "Virtual environment ready for deployment"
+          ls -la venv/bin/
+          echo "Python version in venv:"
+          venv/bin/python --version
+
+      # 10. Deploy to Firebase Functions
+      - name: Deploy to Firebase Functions
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Functions directory contents:"
+          ls -la functions/
+          echo "Virtual environment contents:"
+          ls -la functions/venv/bin/ || echo "No venv/bin directory found"
+          echo "Python version in venv:"
+          functions/venv/bin/python --version
+          echo "Setting up environment for Firebase..."
+          cd functions
+          source venv/bin/activate
+          pip install -r requirements.txt
+          cd ..
+          firebase deploy --only functions --project "${{ secrets.FIREBASE_PROJECT_ID }}" --token "${{ secrets.FIREBASE_TOKEN }}" --force
+
+      # 11. Verify deployment
+      - name: Verify deployment
+        run: |
+          echo "✅ Firebase Functions deployed successfully!"
+          echo "Environment: ${{ github.ref == 'refs/heads/master' && 'Production' || 'Staging' }}"
+          echo "Functions available at:"
+          echo "- calculate_horoscope"
+          echo "- calculate_aspects" 
+          echo "- moon_phase"

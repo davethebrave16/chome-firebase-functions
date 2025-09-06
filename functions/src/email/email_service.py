@@ -1,24 +1,34 @@
+"""Email service using Brevo API."""
+
 import os
 import requests
-from typing import Dict, List, Optional
-from firebase_functions import https_fn
+from typing import Dict, Optional
+from datetime import datetime
+
+from ..config.settings import settings
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
-class BrevoEmailService:
-    """Centralized email service using Brevo API"""
+class EmailService:
+    """Centralized email service using Brevo API."""
     
     def __init__(self):
-        self.api_key = os.environ.get("BREVO_SMTP_API_KEY")
-        self.base_url = os.environ.get("BREVO_SMTP_BASE_URL")
-        self.sender_email = os.environ.get("BREVO_SMTP_SENDER_EMAIL", "davethebrave160691@gmail.com")
-        self.sender_name = os.environ.get("BREVO_SMTP_SENDER_NAME", "The VisitHome Team")
+        """Initialize the email service with configuration."""
+        self.api_key = settings.brevo_smtp_api_key
+        self.base_url = settings.brevo_smtp_base_url
+        self.sender_email = settings.brevo_smtp_sender_email
+        self.sender_name = settings.brevo_smtp_sender_name
         
         if not self.api_key:
             raise ValueError("BREVO_SMTP_API_KEY environment variable is required")
+        if not self.base_url:
+            raise ValueError("BREVO_SMTP_BASE_URL environment variable is required")
     
     def _format_event_date(self, date_value) -> str:
         """
-        Format event date in a user-friendly way
+        Format event date in a user-friendly way.
         
         Args:
             date_value: Date value from Firestore (could be datetime, string, or other)
@@ -32,7 +42,6 @@ class BrevoEmailService:
         try:
             # If it's a Firestore DatetimeWithNanoseconds
             if hasattr(date_value, 'strftime'):
-                # Format as "Monday, August 12, 2025 at 2:42 PM"
                 return date_value.strftime("%A, %B %d, %Y at %I:%M %p")
             
             # If it's a string, try to parse it
@@ -41,7 +50,6 @@ class BrevoEmailService:
             
             # If it's a timestamp or other numeric type
             elif hasattr(date_value, 'timestamp'):
-                from datetime import datetime
                 dt = datetime.fromtimestamp(date_value.timestamp())
                 return dt.strftime("%A, %B %d, %Y at %I:%M %p")
             
@@ -50,7 +58,7 @@ class BrevoEmailService:
                 return str(date_value)
                 
         except Exception as e:
-            print(f"Error formatting date {date_value}: {str(e)}")
+            logger.error(f"Error formatting date {date_value}: {str(e)}")
             return str(date_value)
     
     def send_email(
@@ -64,7 +72,7 @@ class BrevoEmailService:
         template_data: Optional[Dict] = None
     ) -> Dict:
         """
-        Send an email using Brevo API
+        Send an email using Brevo API.
         
         Args:
             to_email: Recipient email address
@@ -111,17 +119,18 @@ class BrevoEmailService:
             response = requests.post(
                 f"{self.base_url}/smtp/email",
                 headers=headers,
-                json=payload
+                json=payload,
+                timeout=30
             )
             response.raise_for_status()
             
             result = response.json()
-            print(f"Email sent successfully to {to_email}. Message ID: {result.get('messageId')}")
+            logger.info(f"Email sent successfully to {to_email}. Message ID: {result.get('messageId')}")
             return {"success": True, "message_id": result.get("messageId"), "response": result}
             
         except requests.exceptions.RequestException as e:
             error_msg = f"Failed to send email to {to_email}: {str(e)}"
-            print(error_msg)
+            logger.error(error_msg)
             return {"success": False, "error": str(e)}
     
     def send_reservation_confirmation_email(
@@ -132,7 +141,7 @@ class BrevoEmailService:
         event_data: Dict
     ) -> Dict:
         """
-        Send reservation confirmation email
+        Send reservation confirmation email.
         
         Args:
             user_email: User's email address
@@ -169,7 +178,7 @@ class BrevoEmailService:
         reservation_data: Dict,
         event_data: Dict
     ) -> str:
-        """Create HTML content for reservation confirmation email"""
+        """Create HTML content for reservation confirmation email."""
         event_name = event_data.get('name', 'Event')
         event_date = self._format_event_date(event_data.get('date'))
         event_location = event_data.get('address', 'TBD')
@@ -226,7 +235,7 @@ class BrevoEmailService:
         reservation_data: Dict,
         event_data: Dict
     ) -> str:
-        """Create plain text content for reservation confirmation email"""
+        """Create plain text content for reservation confirmation email."""
         event_name = event_data.get('name', 'Event')
         event_date = self._format_event_date(event_data.get('date'))
         event_location = event_data.get('address', 'TBD')
@@ -255,56 +264,16 @@ This is an automated message from Chome System
         return text.strip()
 
 
-# Global instance for easy access - initialized lazily
-_email_service_instance = None
-
-def get_email_service():
-    """Get or create the email service instance"""
-    global _email_service_instance
-    if _email_service_instance is None:
-        _email_service_instance = BrevoEmailService()
-    return _email_service_instance
+# Global email service instance
+_email_service: Optional[EmailService] = None
 
 
-def send_email(
-    to_email: str,
-    to_name: str,
-    subject: str,
-    html_content: str,
-    text_content: Optional[str] = None,
-    template_id: Optional[int] = None,
-    template_data: Optional[Dict] = None
-) -> Dict:
-    """
-    Convenience function to send emails using the global email service instance
-    
-    Args:
-        to_email: Recipient email address
-        to_name: Recipient name
-        subject: Email subject
-        html_content: HTML content of the email
-        text_content: Plain text content (optional)
-        template_id: Brevo template ID (optional)
-        template_data: Data for template variables (optional)
-    
-    Returns:
-        Dict containing the send result
-    """
-    try:
-        email_service = get_email_service()
-        return email_service.send_email(
-            to_email=to_email,
-            to_name=to_name,
-            subject=subject,
-            html_content=html_content,
-            text_content=text_content,
-            template_id=template_id,
-            template_data=template_data
-        )
-    except Exception as e:
-        error_msg = f"Email service error: {str(e)}"
-        print(error_msg)
-        return {"success": False, "error": error_msg}
+def get_email_service() -> EmailService:
+    """Get or create the email service instance."""
+    global _email_service
+    if _email_service is None:
+        _email_service = EmailService()
+    return _email_service
 
 
 def send_reservation_confirmation_email(
@@ -314,7 +283,7 @@ def send_reservation_confirmation_email(
     event_data: Dict
 ) -> Dict:
     """
-    Convenience function to send reservation confirmation emails
+    Convenience function to send reservation confirmation emails.
     
     Args:
         user_email: User's email address
@@ -335,4 +304,5 @@ def send_reservation_confirmation_email(
         )
     except Exception as e:
         error_msg = f"Reservation confirmation email error: {str(e)}"
+        logger.error(error_msg)
         return {"success": False, "error": error_msg}

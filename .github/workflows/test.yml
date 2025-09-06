@@ -1,0 +1,79 @@
+name: Test Firebase Functions
+
+on:
+  pull_request:
+    branches:
+      - master
+      - develop
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/master' && 'prod' || 'staging' }}
+
+    steps:
+      # 1. Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      # 3. Create virtual environment
+      - name: Create virtual environment
+        working-directory: ./functions
+        run: python -m venv venv
+
+      # 4. Install dependencies
+      - name: Install dependencies
+        working-directory: ./functions
+        run: |
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      # 5. Create .env file from GitHub Secrets
+      - name: Create .env file
+        working-directory: ./functions
+        run: |
+          echo "SECRET=${{ secrets.SECRET }}" >> .env
+          echo "RESERVATION_EXP_TIME=${{ vars.RESERVATION_EXP_TIME }}" >> .env
+          echo "RESERVATION_EXP_CHECK_URL=${{ secrets.RESERVATION_EXP_CHECK_URL }}" >> .env
+          echo "GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" >> .env
+          echo "TASK_QUEUE_NAME=${{ vars.TASK_QUEUE_NAME }}" >> .env
+          echo "TASK_QUEUE_REGION=${{ vars.TASK_QUEUE_REGION }}" >> .env
+          echo "TASK_SCHEDULE_DELAY=${{ vars.TASK_SCHEDULE_DELAY }}" >> .env
+          echo "STORAGE_BUCKET=${{ secrets.STORAGE_BUCKET }}" >> .env
+          echo "BREVO_SMTP_API_KEY=${{ secrets.BREVO_SMTP_API_KEY }}" >> .env
+          echo "BREVO_SMTP_BASE_URL=${{ vars.BREVO_SMTP_BASE_URL }}" >> .env
+          echo "BREVO_SMTP_SENDER_EMAIL=${{ vars.BREVO_SMTP_SENDER_EMAIL }}" >> .env
+          echo "BREVO_SMTP_SENDER_NAME=${{ vars.BREVO_SMTP_SENDER_NAME }}" >> .env
+
+      # 6. Run tests
+      - name: Run tests
+        working-directory: ./functions
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          pytest tests/ -v
+
+      # 7. Run tests with coverage
+      - name: Run tests with coverage
+        working-directory: ./functions
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          pytest tests/ --cov=src --cov-report=xml --cov-report=term
+
+      # 8. Upload coverage to Codecov (optional)
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./functions/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
