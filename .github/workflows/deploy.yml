@@ -83,6 +83,8 @@ jobs:
           ls -la venv/bin/
           echo "Python version in venv:"
           venv/bin/python --version
+          # Test that imports work
+          python -c "import sys; sys.path.insert(0, '.'); from src.main import on_reservation_confirmed; print('Import test successful')"
 
       # 10. Deploy to Firebase Functions
       - name: Deploy to Firebase Functions
