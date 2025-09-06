@@ -33,7 +33,7 @@ class Settings:
         self.brevo_smtp_api_key: Optional[str] = os.environ.get("BREVO_SMTP_API_KEY")
         self.brevo_smtp_base_url: Optional[str] = os.environ.get("BREVO_SMTP_BASE_URL")
         self.brevo_smtp_sender_email: str = os.environ.get("BREVO_SMTP_SENDER_EMAIL", "davethebrave160691@gmail.com")
-        self.brevo_smtp_sender_name: str = os.environ.get("BREVO_SMT_SENDER_NAME", "The VisitHome Team")
+        self.brevo_smtp_sender_name: str = os.environ.get("BREVO_SMTP_SENDER_NAME", "The VisitHome Team")
     
     def validate(self) -> None:
         """Validate that all required settings are present."""
