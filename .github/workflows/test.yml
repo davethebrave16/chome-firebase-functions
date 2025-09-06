@@ -28,21 +28,15 @@ jobs:
         run: python -m venv venv
 
       # 4. Install dependencies
-      - name: Install production dependencies
+      - name: Install dependencies
         working-directory: ./functions
         run: |
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest pytest-cov
 
-      # 5. Install development dependencies
-      - name: Install development dependencies
-        working-directory: ./functions
-        run: |
-          source venv/bin/activate
-          pip install -r requirements-dev.txt
-
-      # 6. Create .env file from GitHub Secrets
+      # 5. Create .env file from GitHub Secrets
       - name: Create .env file
         working-directory: ./functions
         run: |
@@ -59,21 +53,21 @@ jobs:
           echo "BREVO_SMTP_SENDER_EMAIL=${{ vars.BREVO_SMTP_SENDER_EMAIL }}" >> .env
           echo "BREVO_SMTP_SENDER_NAME=${{ vars.BREVO_SMTP_SENDER_NAME }}" >> .env
 
-      # 7. Run tests
+      # 6. Run tests
       - name: Run tests
         working-directory: ./functions
         run: |
           source venv/bin/activate
           pytest tests/ -v
 
-      # 8. Run tests with coverage
+      # 7. Run tests with coverage
       - name: Run tests with coverage
         working-directory: ./functions
         run: |
           source venv/bin/activate
           pytest tests/ --cov=src --cov-report=xml --cov-report=term
 
-      # 9. Upload coverage to Codecov (optional)
+      # 8. Upload coverage to Codecov (optional)
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:

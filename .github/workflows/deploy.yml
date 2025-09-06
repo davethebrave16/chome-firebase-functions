@@ -28,21 +28,15 @@ jobs:
         run: python -m venv venv
 
       # 4. Install dependencies
-      - name: Install production dependencies
+      - name: Install dependencies
         working-directory: ./functions
         run: |
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest pytest-cov
 
-      # 5. Install development dependencies
-      - name: Install development dependencies
-        working-directory: ./functions
-        run: |
-          source venv/bin/activate
-          pip install -r requirements-dev.txt
-
-      # 6. Create .env file from GitHub Secrets
+      # 5. Create .env file from GitHub Secrets
       - name: Create .env file
         working-directory: ./functions
         run: |
@@ -59,25 +53,25 @@ jobs:
           echo "BREVO_SMTP_SENDER_EMAIL=${{ vars.BREVO_SMTP_SENDER_EMAIL }}" >> .env
           echo "BREVO_SMTP_SENDER_NAME=${{ vars.BREVO_SMTP_SENDER_NAME }}" >> .env
 
-      # 7. Run tests
+      # 6. Run tests
       - name: Run tests
         working-directory: ./functions
         run: |
           source venv/bin/activate
           pytest tests/ -v
 
-      # 8. Run tests with coverage
+      # 7. Run tests with coverage
       - name: Run tests with coverage
         working-directory: ./functions
         run: |
           source venv/bin/activate
           pytest tests/ --cov=src --cov-report=xml --cov-report=term
 
-      # 9. Install Firebase CLI
+      # 8. Install Firebase CLI
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      # 10. Ensure virtual environment is ready for Firebase
+      # 9. Ensure virtual environment is ready for Firebase
       - name: Prepare virtual environment for deployment
         working-directory: ./functions
         run: |
@@ -88,7 +82,7 @@ jobs:
           echo "Python version in venv:"
           venv/bin/python --version
 
-      # 11. Deploy to Firebase Functions
+      # 10. Deploy to Firebase Functions
       - name: Deploy to Firebase Functions
         run: |
           echo "Current directory: $(pwd)"
@@ -105,7 +99,7 @@ jobs:
           cd ..
           firebase deploy --only functions --project "${{ secrets.FIREBASE_PROJECT_ID }}" --token "${{ secrets.FIREBASE_TOKEN }}" --force
 
-      # 12. Verify deployment
+      # 11. Verify deployment
       - name: Verify deployment
         run: |
           echo "✅ Firebase Functions deployed successfully!"
