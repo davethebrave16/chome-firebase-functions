@@ -99,6 +99,10 @@ jobs:
           source venv/bin/activate
           pip install -r requirements.txt
           cd ..
+          # Set Python path and version for Firebase CLI
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)/functions"
+          export PYTHON_VERSION="3.12"
+          # Use the virtual environment Python explicitly
           firebase deploy --only functions --project "${{ secrets.FIREBASE_PROJECT_ID }}" --token "${{ secrets.FIREBASE_TOKEN }}" --force
 
       # 11. Verify deployment
