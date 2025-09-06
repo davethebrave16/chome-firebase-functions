@@ -1,0 +1,108 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Project Rules for Python Development
+
+This guide outlines best practices and standards for writing clean, efficient, and maintainable Python code. It is intended to be used as a foundation for any Python project.
+
+## 📜 Development Philosophy
+
+-   **The Zen of Python**: Adhere to the principles of `import this`. Code should be simple, readable, and explicit.
+-   **Readability Counts**: Write code for humans first, computers second. Clear code is less prone to bugs.
+-   **KISS (Keep It Simple, Stupid)**: Prefer the simplest solution that works. Avoid unnecessary complexity.
+-   **DRY (Don't Repeat Yourself)**: Encapsulate and reuse code to avoid duplication.
+
+---
+
+## 🎨 Code Style & Formatting (PEP 8)
+
+-   **Indentation**: Use **4 spaces** per indentation level. Do not use tabs.
+-   **Line Length**: Limit all lines to a maximum of **88 characters** to align with modern tools like Black.
+-   **Imports**:
+    -   Imports should be at the top of the file, right after module comments and docstrings.
+    -   Group imports in the following order:
+        1.  Standard library imports (e.g., `os`, `sys`).
+        2.  Third-party library imports (e.g., `requests`, `pandas`).
+        3.  Local application/library specific imports.
+    -   Use absolute imports over relative imports where possible.
+-   **Quotes**: Use **double-quotes** (`"`) for strings consistently, unless a string contains double-quotes, in which case you can use single-quotes (`'`).
+-   **Whitespace**: Use whitespace judiciously to improve readability. Avoid extraneous whitespace.
+-   **Automated Formatting**: Use an automated code formatter like **Black** to enforce a consistent style across the project. Use a linter like **Flake8** or **Ruff** to catch errors and style issues.
+
+---
+
+## 📛 Naming Conventions
+
+-   **Variables & Functions**: Use `snake_case` (e.g., `user_name`, `calculate_total()`).
+-   **Constants**: Use `UPPER_SNAKE_CASE` (e.g., `MAX_CONNECTIONS = 10`).
+-   **Classes**: Use `PascalCase` (e.g., `class UserProfile:`).
+-   **Modules & Packages**: Use short, all-lowercase names. Underscores can be used if it improves readability (e.g., `db_utils.py`).
+-   **Protected/Private**: Use a single leading underscore `_` for protected members and a double leading underscore `__` for name-mangled private attributes.
+
+---
+
+## 🏗️ Project Structure & Dependencies
+
+-   **Virtual Environments**: **Always** use a virtual environment (e.g., via `venv`). Create it in a `.venv` directory at the project root.
+-   **Dependency Management**: Manage all project dependencies in a `requirements.txt` file. Use `pip freeze > requirements.txt` to generate it.
+-   **Standard Layout**: Organize the project with a `src/` directory for application code and a `tests/` directory for tests.
+    ```
+    /project-root
+    ├── .venv/
+    ├── src/
+    │   └── main.py
+    ├── tests/
+    │   └── test_main.py
+    ├── requirements.txt
+    └── README.md
+    ```
+
+---
+
+## ✍️ Functions, Classes & Error Handling
+
+-   **Functions**: Should have a **single responsibility**. Keep them short and focused.
+-   **Type Hinting**: Use Python's type hints for all function signatures and variables to improve clarity and allow static analysis.
+    ```python
+    def get_user(user_id: int) -> dict[str, any]:
+        # ... function logic ...
+    ```
+-   **Error Handling**:
+    -   Be specific with exceptions. Avoid catching a bare `except Exception:`.
+    -   Use `try...except...else...finally` blocks correctly to handle errors gracefully.
+    -   Create custom exceptions for application-specific error conditions.
+
+---
+
+## 🧪 Testing
+
+-   **Framework**: Use **pytest** as the primary testing framework.
+-   **Test Location**: Keep tests in a separate `tests/` directory that mirrors your `src/` package structure.
+-   **Coverage**: Aim for high test coverage for business logic. Unit tests should be fast and isolated.
+-   **Mocks**: Use mocking libraries (like `unittest.mock`) to isolate units of code from external dependencies (APIs, databases).
+
+---
+
+## 📚 Documentation
+
+-   **Docstrings (PEP 257)**: Write clear and concise docstrings for all modules, classes, and functions.
+-   **Docstring Format**: Use a standard format like **Google Style** or reStructuredText for consistency.
+    ```python
+    """Module providing utility functions for data processing."""
+
+    class DataProcessor:
+        """A class to process raw data files."""
+
+        def process_file(self, file_path: str) -> bool:
+            """Processes a single data file and returns its success status.
+
+            Args:
+                file_path: The absolute path to the data file.
+
+            Returns:
+                True if processing was successful, False otherwise.
+            """
+            # ...
+    ```
