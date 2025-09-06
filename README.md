@@ -2,7 +2,7 @@
 
 A refactored Firebase Cloud Functions project built with Python following best practices. Provides backend services for event management, reservation systems, and automated email notifications.
 
-## 🚀 Features
+## 🚀 Features 
 
 ### Event Management
 - **Event Creation**: Automatic handling of event creation with duplication support
