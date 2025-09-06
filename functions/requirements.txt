@@ -1,3 +1,16 @@
-firebase_functions~=0.1.0
-google-cloud-tasks~=2.19.2
-requests~=2.31.0
+# Firebase Functions dependencies
+firebase-functions==0.1.0
+firebase-admin==6.4.0
+
+# Google Cloud dependencies
+google-cloud-firestore==2.13.1
+google-cloud-tasks==2.19.2
+
+# HTTP requests
+requests==2.31.0
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Type hints support
+typing-extensions==4.8.0
