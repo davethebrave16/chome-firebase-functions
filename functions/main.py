@@ -10,7 +10,7 @@ if os.path.exists('.env'):
     print("Environment variables loaded from .env file")
 
 # Import all functions from the main module
-from src.chome_functions.main import (
+from src.main import (
     on_reservation_confirmed,
     on_event_created,
     on_event_delete,

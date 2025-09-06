@@ -32,7 +32,7 @@ A refactored Firebase Cloud Functions project built with Python following best p
 ```
 chome-firebase-functions/
 ├── functions/                          # Cloud Functions source code
-│   ├── src/chome_functions/           # Refactored package structure
+│   ├── src/                           # Refactored package structure
 │   │   ├── main.py                    # Main Firebase Functions
 │   │   ├── config/                    # Configuration management
 │   │   │   └── settings.py            # Environment variables & validation

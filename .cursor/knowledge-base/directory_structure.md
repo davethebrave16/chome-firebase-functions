@@ -16,32 +16,30 @@
 - **functions/**
     - .gitignore
     - main.py
-    - README.md
     - requirements.txt
     - setup.py
     - **src/**
-        - **chome_functions/**
-            - **auth/**
-                - auth_service.py
-                - __init__.py
-            - **config/**
-                - __init__.py
-                - settings.py
-            - **email/**
-                - email_service.py
-                - __init__.py
-            - **events/**
-                - event_service.py
-                - __init__.py
+        - **auth/**
+            - auth_service.py
             - __init__.py
-            - main.py
-            - **reservations/**
-                - __init__.py
-                - reservation_service.py
-            - **utils/**
-                - firestore_client.py
-                - __init__.py
-                - logging.py
+        - **config/**
+            - __init__.py
+            - settings.py
+        - **email/**
+            - email_service.py
+            - __init__.py
+        - **events/**
+            - event_service.py
+            - __init__.py
+        - __init__.py
+        - main.py
+        - **reservations/**
+            - __init__.py
+            - reservation_service.py
+        - **utils/**
+            - firestore_client.py
+            - __init__.py
+            - logging.py
     - test_env.py
     - test_import.py
     - **tests/**
