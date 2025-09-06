@@ -1,37 +1,66 @@
 # Chome Firebase Functions
 
-A Firebase Cloud Functions project built with Python that provides backend services for event management and reservation systems.
+A refactored Firebase Cloud Functions project built with Python following best practices. Provides backend services for event management, reservation systems, and automated email notifications.
 
 ## 🚀 Features
 
-- **Event Management**: Create, duplicate, and delete events with automatic association handling
-- **Reservation System**: Handle event reservations with expiration checks and confirmations
-- **Email Notifications**: Automatic email confirmations using Brevo SMTP API
-- **Authentication**: Token verification for secure API endpoints
-- **Cloud Tasks Integration**: Scheduled tasks for reservation expiration management
-- **Firestore Triggers**: Automatic document change handling
+### Event Management
+- **Event Creation**: Automatic handling of event creation with duplication support
+- **Event Duplication**: Clone events with all associated questions and media files
+- **Event Deletion**: Clean removal of events with automatic cleanup of associations
+- **Media Management**: Automatic file duplication and deletion in Google Cloud Storage
+
+### Reservation System
+- **Reservation Creation**: Automatic scheduling of expiration checks for new reservations
+- **Reservation Confirmation**: Email notifications when reservations are confirmed
+- **Expiration Management**: Automated cleanup of expired reservations using Cloud Tasks
+- **Status Tracking**: Real-time monitoring of reservation status changes
+
+### Email Notifications
+- **Automatic Triggers**: Emails sent automatically on reservation confirmation
+- **Professional Templates**: Beautiful HTML and plain text email templates
+- **Brevo Integration**: Reliable email delivery using Brevo SMTP API
+- **Error Handling**: Comprehensive error handling and retry logic
+
+### Authentication & Security
+- **Token Verification**: Secure API endpoints with token-based authentication
+- **Environment Configuration**: Centralized configuration management
+- **Input Validation**: Comprehensive input validation and sanitization
 
 ## 🏗️ Project Structure
 
 ```
 chome-firebase-functions/
-├── functions/                 # Cloud Functions source code
-│   ├── main.py              # Main function definitions
-│   ├── auth.py              # Authentication utilities
-│   ├── events.py            # Event management functions
-│   ├── reservations.py      # Reservation handling functions
-│   ├── email_service.py     # Centralized email service (Brevo)
-│   └── requirements.txt     # Python dependencies
-├── api_docs/                # API documentation (Bruno)
-├── firebase.json            # Firebase configuration
-├── firestore.rules          # Firestore security rules
-├── firestore.indexes.json   # Firestore indexes
-└── storage.rules            # Storage security rules
+├── functions/                          # Cloud Functions source code
+│   ├── src/chome_functions/           # Refactored package structure
+│   │   ├── main.py                    # Main Firebase Functions
+│   │   ├── config/                    # Configuration management
+│   │   │   └── settings.py            # Environment variables & validation
+│   │   ├── utils/                     # Utility functions
+│   │   │   ├── firestore_client.py    # Firestore client management
+│   │   │   └── logging.py             # Structured logging
+│   │   ├── auth/                      # Authentication service
+│   │   │   └── auth_service.py        # Token verification
+│   │   ├── events/                    # Event management service
+│   │   │   └── event_service.py       # Event operations
+│   │   ├── reservations/              # Reservation management service
+│   │   │   └── reservation_service.py # Reservation operations
+│   │   └── email/                     # Email service
+│   │       └── email_service.py       # Brevo email integration
+│   ├── tests/                         # Test directory
+│   ├── main.py                        # Entry point (imports from src/)
+│   ├── requirements.txt               # Python dependencies
+│   └── setup.py                       # Package setup
+├── api_docs/                          # API documentation (Bruno)
+├── firebase.json                      # Firebase configuration
+├── firestore.rules                    # Firestore security rules
+├── firestore.indexes.json             # Firestore indexes
+└── storage.rules                      # Storage security rules
 ```
 
 ## 🛠️ Prerequisites
 
-- Python 3.9+
+- Python 3.8+
 - Firebase CLI
 - Google Cloud SDK
 - Firebase project with Firestore and Storage enabled
@@ -56,22 +85,56 @@ chome-firebase-functions/
    firebase login
    ```
 
-4. **Install Python dependencies**
+4. **Set up Python environment**
    ```bash
    cd functions
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
    ```
 
 ## 🔧 Configuration
+
+### Environment Variables
+
+Create a `.env` file in the `functions/` directory with the following variables:
+
+```bash
+# Authentication
+SECRET=your_secret_token_here
+
+# GCP Configuration
+GCP_PROJECT_ID=your_project_id
+TASK_QUEUE_REGION=europe-west1
+TASK_QUEUE_NAME=your_queue_name
+
+# Reservation Configuration
+RESERVATION_EXP_TIME=3600
+RESERVATION_EXP_CHECK_URL=https://your-function-url.com/verify_reservation_expiration
+TASK_SCHEDULE_DELAY=300
+
+# Email Configuration (Brevo)
+BREVO_SMTP_API_KEY=your_brevo_api_key
+BREVO_SMTP_BASE_URL=https://api.brevo.com/v3
+BREVO_SMTP_SENDER_EMAIL=your_email@example.com
+BREVO_SMTP_SENDER_NAME=Your Name
+
+# Firebase Functions Region
+FUNCTIONS_REGION=europe-west1
+```
+
+### Firebase Project Setup
 
 1. **Set up Firebase project**
    ```bash
    firebase use --add
    ```
 
-2. **Configure environment variables** (if needed)
-   - Create a `.env` file in the `functions/` directory
-   - Add any required environment variables
+2. **Enable required services**
+   - Firestore Database
+   - Cloud Storage
+   - Cloud Functions
+   - Cloud Tasks (for reservation expiration)
 
 ## 🚀 Development
 
@@ -79,6 +142,8 @@ chome-firebase-functions/
 
 1. **Start Firebase emulators**
    ```bash
+   cd functions
+   source venv/bin/activate
    firebase emulators:start
    ```
 
@@ -93,139 +158,192 @@ The project includes Bruno API documentation for testing endpoints:
 - Navigate to `api_docs/Chome Firebase Function/`
 - Use Bruno to test the various API endpoints
 
-## 📡 API Endpoints
+## 📡 Firebase Functions
 
-### HTTP Functions
+### Event Management Functions
 
-- **`on_reservation_confirmed`** - Triggered when a reservation is confirmed
-  - Document path: `event_reservation/{res_id}`
-  - Trigger: When `confirmed` field changes to `true`
-  - Region: `europe-west1`
+#### `on_event_created`
+- **Trigger**: Firestore document creation
+- **Path**: `event/{event_id}`
+- **Purpose**: Handles new event creation and duplication logic
+- **Features**:
+  - Detects if event is a duplicate (`duplicateFrom` field)
+  - Automatically duplicates event associations (questions, media)
+  - Logs event creation with details
 
-- **`verify_reservation_expiration`** - Check reservation expiration
-  - Method: GET
-  - Query params: `res_id`
-  - Authentication: Required
-  - Region: `europe-west1`
+#### `on_event_delete`
+- **Trigger**: Firestore document deletion
+- **Path**: `event/{event_id}`
+- **Purpose**: Cleans up event associations when event is deleted
+- **Features**:
+  - Deletes all associated survey questions
+  - Removes all associated media files from storage
+  - Cleans up database references
 
-### Firestore Triggers
+### Reservation Management Functions
 
-- **`on_event_created`** - Triggered when an event document is created
-  - Document path: `event/{event_id}`
-  - Handles event duplication logic
+#### `on_reservation_created`
+- **Trigger**: Firestore document creation
+- **Path**: `event_reservation/{res_id}`
+- **Purpose**: Schedules expiration check for new reservations
+- **Features**:
+  - Creates Cloud Task for expiration check
+  - Configurable delay before expiration check
+  - Logs reservation creation details
 
-- **`on_event_delete`** - Triggered when an event document is deleted
-  - Document path: `event/{event_id}`
-  - Cleans up event associations
+#### `on_reservation_confirmed`
+- **Trigger**: Firestore document update
+- **Path**: `event_reservation/{res_id}`
+- **Purpose**: Sends confirmation email when reservation is confirmed
+- **Features**:
+  - Detects `confirmed` field change from `false` to `true`
+  - Gathers user, event, and reservation data
+  - Sends professional confirmation email
+  - Comprehensive error handling
 
-- **`on_reservation_created`** - Triggered when a reservation is created
-  - Document path: `event_reservation/{res_id}`
-  - Schedules expiration checks
+#### `verify_reservation_expiration`
+- **Type**: HTTP function
+- **Method**: GET
+- **Purpose**: Checks if a reservation has expired
+- **Features**:
+  - Requires authentication token
+  - Validates reservation existence
+  - Checks expiration based on creation time
+  - Deletes expired reservations
+  - Returns appropriate status codes
 
-- **`on_user_created`** - Triggered when a user document is created
-  - Document path: `user/{user_id}`
-  - Automatically manages name field consistency
-  - Creates missing firstName/lastName from display_name or vice versa
+### User Management Functions
 
-## 📧 Email Service
+#### `on_user_created`
+- **Trigger**: Firestore document creation
+- **Path**: `user/{user_id}`
+- **Purpose**: Ensures consistent user name field formatting
+- **Features**:
+  - Creates `firstName` and `lastName` from `display_name`
+  - Creates `display_name` from `firstName` and `lastName`
+  - Handles single name scenarios
+  - Updates user document automatically
 
-### Overview
-The project includes a centralized email service using Brevo SMTP API for sending automatic email notifications. The service is primarily used for sending reservation confirmation emails when a reservation is marked as confirmed.
+## 📧 Email Service Features
 
-### Features
-- **Centralized Service**: Single `email_service.py` file handling all email operations
-- **Brevo Integration**: Uses Brevo SMTP API for reliable email delivery
-- **Professional Templates**: Beautiful HTML and plain text email templates
-- **Automatic Triggering**: Emails are sent automatically when reservations are confirmed
-- **Error Handling**: Comprehensive error handling and logging
-
-### How It Works
-1. **Trigger**: When an `event_reservation` document is updated and the `confirmed` field changes from `false/undefined` to `true`
-2. **Data Collection**: The service gathers reservation, user, and event information from Firestore
-3. **Email Generation**: Creates professional HTML and plain text email content
-4. **Delivery**: Sends the email via Brevo SMTP API
-5. **Logging**: Provides detailed logging for debugging and monitoring
+### Automatic Email Triggers
+- **Reservation Confirmation**: Sent when `confirmed` field changes to `true`
+- **Professional Templates**: Beautiful HTML with plain text fallback
+- **Event Details**: Includes event name, date, location, and reservation ID
+- **Responsive Design**: Works on all devices and email clients
 
 ### Email Content
-The confirmation emails include:
-- **Event Details**: Name, date, and address
-- **Reservation Information**: Reservation ID and confirmation status
-- **Professional Design**: Responsive HTML template with fallback plain text
-- **Branding**: Customizable sender name and email address
+- **Subject**: "Reservation Confirmed - {Event Name}"
+- **HTML Template**: Professional design with event details
+- **Plain Text**: Fallback for email clients that don't support HTML
+- **Branding**: Customizable sender name and email
 
-### Configuration Required
+### Configuration
 ```bash
-# Brevo Email Service Configuration
-BREVO_SMTP_API_KEY=your_brevo_smtp_api_key
+# Required for email functionality
+BREVO_SMTP_API_KEY=your_brevo_api_key
 BREVO_SMTP_BASE_URL=https://api.brevo.com/v3
-SENDER_EMAIL=your_verified_email@domain.com
-SENDER_NAME=Chome System
+BREVO_SMTP_SENDER_EMAIL=your_verified_email@domain.com
+BREVO_SMTP_SENDER_NAME=Your Brand Name
 ```
 
 ### Domain Verification
-**Important**: Before using custom sender domains (e.g., `noreply@yourdomain.com`), you must verify your domain in Brevo:
+Before using custom sender domains, verify your domain in Brevo:
 1. Go to Brevo Dashboard → Senders & IP → Senders
-2. Add your domain and follow the verification process
-3. Add the provided DNS records to your domain
-4. Wait for verification (can take 24-48 hours)
+2. Add your domain and follow verification process
+3. Add DNS records to your domain
+4. Wait for verification (24-48 hours)
 
-### Testing
-Test the email service by updating a reservation document:
-```javascript
-// In your frontend or admin panel
-await updateDoc(doc(db, 'event_reservation', 'reservation_id'), {
-  confirmed: true
-});
+## 🔒 Security Features
 
-// The confirmation email will be sent automatically!
-```
+### Authentication
+- **Token-based**: All HTTP endpoints require valid authentication token
+- **Environment Variables**: Sensitive data stored in environment variables
+- **Input Validation**: Comprehensive validation of all inputs
+
+### Firestore Security
+- **Rules**: Configured in `firestore.rules`
+- **Indexes**: Optimized queries in `firestore.indexes.json`
+- **Access Control**: Proper user and admin access controls
+
+### Storage Security
+- **Rules**: Configured in `storage.rules`
+- **File Validation**: Proper file type and size validation
+- **Access Control**: Secure file access patterns
 
 ## 🚀 Deployment
 
-### Deploy to Firebase
+### Deploy Functions
+```bash
+# Deploy all functions
+firebase deploy --only functions
 
-1. **Deploy functions only**
-   ```bash
-   firebase deploy --only functions
-   ```
+# Deploy specific function
+firebase deploy --only functions:functionName
 
-2. **Deploy everything**
-   ```bash
-   firebase deploy
-   ```
+# Deploy with environment variables
+firebase functions:config:set secret.key="your_secret"
+firebase deploy --only functions
+```
 
-3. **Deploy specific functions**
-   ```bash
-   firebase deploy --only functions:functionName
-   ```
+### Production Checklist
+- [ ] Set all required environment variables
+- [ ] Configure proper IAM permissions
+- [ ] Set up monitoring and logging
+- [ ] Configure function timeout and memory limits
+- [ ] Test all functions thoroughly
+- [ ] Verify email service configuration
 
-### Production Considerations
+## 📊 Monitoring & Logging
 
-- Ensure proper environment variables are set
-- Configure appropriate IAM permissions
-- Set up monitoring and logging
-- Consider function timeout and memory limits
+### Structured Logging
+- **Levels**: INFO, WARNING, ERROR with appropriate context
+- **Format**: Timestamp, module, level, message
+- **Context**: Function names, user IDs, operation details
 
-## 🔒 Security
-
-- **Firestore Rules**: Configured in `firestore.rules`
-- **Storage Rules**: Configured in `storage.rules`
-- **Authentication**: Token verification for sensitive endpoints
-- **CORS**: Configure as needed for your frontend
-
-## 📊 Monitoring
-
-- **Logs**: View function logs in Firebase Console
-- **Metrics**: Monitor function performance and errors
+### Monitoring
+- **Firebase Console**: View function logs and metrics
+- **Cloud Logging**: Advanced log analysis and filtering
 - **Alerts**: Set up alerts for function failures
+- **Performance**: Monitor execution time and memory usage
+
+## 🧪 Testing
+
+### Unit Tests
+```bash
+cd functions
+source venv/bin/activate
+pytest tests/
+```
+
+### Integration Testing
+- Use Bruno API documentation for endpoint testing
+- Test with Firebase emulators for local development
+- Verify email functionality with test accounts
+
+## 🔧 Development Features
+
+### Code Quality
+- **Type Hints**: Full type annotations throughout codebase
+- **Error Handling**: Comprehensive error handling and logging
+- **Clean Architecture**: Separation of concerns with service classes
+- **Documentation**: Comprehensive docstrings and comments
+
+### Development Tools
+- **Linting**: Code quality checks and formatting
+- **Testing**: Unit and integration test framework
+- **Logging**: Structured logging for debugging
+- **Configuration**: Centralized configuration management
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes following the code style
+4. Add tests for new functionality
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
 ## 📝 License
 
@@ -235,8 +353,9 @@ await updateDoc(doc(db, 'event_reservation', 'reservation_id'), {
 
 For issues and questions:
 - Check Firebase documentation
-- Review function logs
+- Review function logs in Firebase Console
 - Open an issue in the repository
+- Check the troubleshooting section below
 
 ## 🔗 Useful Links
 
@@ -244,3 +363,4 @@ For issues and questions:
 - [Python Functions Guide](https://firebase.google.com/docs/functions/get-started?gen=python)
 - [Firestore Documentation](https://firebase.google.com/docs/firestore)
 - [Google Cloud Tasks](https://cloud.google.com/tasks/docs)
+- [Brevo SMTP API](https://developers.brevo.com/reference/sendtransacemail)
