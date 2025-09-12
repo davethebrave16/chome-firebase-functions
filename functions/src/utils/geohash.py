@@ -30,54 +30,31 @@ def encode_geohash(latitude: float, longitude: float, precision: int = 10) -> st
     return pgh.encode(latitude, longitude, precision=precision)
 
 
-def decode_geohash(geohash: str) -> Tuple[float, float, float, float]:
-    """
-    Decode a geohash string to latitude and longitude bounds using pygeohash library.
-    
-    Args:
-        geohash: Geohash string to decode
-        
-    Returns:
-        Tuple of (latitude_min, latitude_max, longitude_min, longitude_max)
-        
-    Raises:
-        ValueError: If geohash contains invalid characters
-    """
-    if not geohash:
-        raise ValueError("Geohash cannot be empty")
-    
-    # Decode to center point
-    lat, lng = pgh.decode(geohash)
-    
-    # Calculate bounds based on geohash precision
-    precision = len(geohash)
-    lat_error = 90.0 / (2 ** (precision * 5 // 2))
-    lng_error = 180.0 / (2 ** ((precision * 5 + 1) // 2))
-    
-    return (
-        lat - lat_error,  # lat_min
-        lat + lat_error,  # lat_max
-        lng - lng_error,  # lng_min
-        lng + lng_error   # lng_max
-    )
-
-
-def get_geohash_center(geohash: str) -> Tuple[float, float]:
-    """
-    Get the center point of a geohash using pygeohash library.
-    
-    Args:
-        geohash: Geohash string
-        
-    Returns:
-        Tuple of (latitude, longitude) representing the center
-    """
-    return pgh.decode(geohash)
-
-
 def calculate_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """
-    Calculate the distance between two points using the Haversine formula.
+    Calculate the distance between two points using pygeohash's haversine distance.
+    
+    Args:
+        lat1, lng1: First point coordinates
+        lat2, lng2: Second point coordinates
+        
+    Returns:
+        Distance in meters
+    """
+    try:
+        # Convert coordinates to geohashes first, then use pygeohash distance
+        geohash1 = pgh.encode(lat1, lng1, precision=10)
+        geohash2 = pgh.encode(lat2, lng2, precision=10)
+        return pgh.geohash_haversine_distance(geohash1, geohash2)
+    except Exception as e:
+        # Fallback to manual Haversine calculation if pygeohash fails
+        print(f"Warning: pygeohash distance calculation failed: {e}, using fallback")
+        return _calculate_distance_haversine(lat1, lng1, lat2, lng2)
+
+
+def _calculate_distance_haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """
+    Fallback Haversine distance calculation.
     
     Args:
         lat1, lng1: First point coordinates
@@ -109,10 +86,10 @@ def calculate_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
 
 def get_geohash_query_bounds(center_lat: float, center_lng: float, radius_meters: float) -> list:
     """
-    Get geohash query bounds for a circular area search.
+    Get geohash query bounds for a circular area search using pygeohash library.
     
-    This implementation follows the Firebase documentation pattern for geohash queries.
-    It calculates multiple geohash bounds to cover a circular area efficiently.
+    This implementation uses pygeohash's built-in functions to efficiently
+    calculate geohash bounds for circular area searches.
     
     Args:
         center_lat: Center latitude
@@ -137,51 +114,200 @@ def get_geohash_query_bounds(center_lat: float, center_lng: float, radius_meters
     else:
         precision = 8
     
-    # Get center geohash
-    center_geohash = encode_geohash(center_lat, center_lng, precision)
+    # Calculate bounding box for the circular area
+    # Convert radius from meters to degrees (approximate)
+    lat_radius = radius_meters / 111000  # 111000m per degree latitude
+    lng_radius = radius_meters / (111000 * math.cos(math.radians(center_lat)))  # Adjust for longitude
     
-    # Calculate approximate geohash cell size for this precision
-    # This is a simplified approach - for production, consider using
-    # a more sophisticated library that provides proper bounds calculation
+    # Create bounding box
+    min_lat = center_lat - lat_radius
+    max_lat = center_lat + lat_radius
+    min_lng = center_lng - lng_radius
+    max_lng = center_lng + lng_radius
+    
+    # Use pygeohash to get all geohashes in the bounding box
+    try:
+        # Create BoundingBox object
+        bbox = pgh.BoundingBox(min_lat, min_lng, max_lat, max_lng)
+        geohashes = pgh.geohashes_in_box(bbox, precision=precision)
+    except Exception as e:
+        # Fallback to manual calculation if pygeohash fails
+        print(f"Warning: pygeohash.geohashes_in_box failed: {e}, using fallback")
+        return _get_geohash_query_bounds_fallback(center_lat, center_lng, radius_meters, precision)
+    
+    # Filter geohashes to only include those within the actual radius
+    filtered_geohashes = []
+    for geohash in geohashes:
+        # Get the center of this geohash
+        geohash_lat, geohash_lng = pgh.decode(geohash)
+        
+        # Calculate distance from center
+        distance = calculate_distance(center_lat, center_lng, geohash_lat, geohash_lng)
+        
+        # Only include if within radius
+        if distance <= radius_meters:
+            filtered_geohashes.append(geohash)
+    
+    # Convert to bounds format
     bounds = []
-    
-    # For now, return a single bound that covers the area
-    # In a production environment, you'd want to calculate multiple bounds
-    # to properly cover the circular area as shown in Firebase docs
-    bounds.append({
-        "startHash": center_geohash,
-        "endHash": center_geohash + "~"  # ~ is the last character in base32
-    })
+    for geohash in filtered_geohashes:
+        bounds.append({
+            "startHash": geohash,
+            "endHash": geohash + "~"  # ~ is the last character in base32
+        })
     
     return bounds
 
 
-def get_geohash_neighbors(geohash: str) -> list:
+def _get_geohash_query_bounds_fallback(center_lat: float, center_lng: float, radius_meters: float, precision: int) -> list:
     """
-    Get the 8 neighboring geohashes for a given geohash.
+    Fallback implementation for geohash query bounds calculation.
     
-    This is useful for expanding search areas and ensuring complete coverage.
+    This is used when pygeohash.geohashes_in_box fails.
+    """
+    # Get center geohash
+    center_geohash = encode_geohash(center_lat, center_lng, precision)
+    
+    # Calculate geohash cell dimensions for this precision
+    lat_error = 90.0 / (2 ** (precision * 5 // 2))
+    lng_error = 180.0 / (2 ** ((precision * 5 + 1) // 2))
+    
+    # Calculate how many geohash cells we need to cover the radius
+    lat_cells = max(1, int(radius_meters / (lat_error * 111000)))  # 111000m per degree lat
+    lng_cells = max(1, int(radius_meters / (lng_error * 111000 * math.cos(math.radians(center_lat)))))
+    
+    bounds = []
+    
+    # Generate bounds by expanding around the center geohash
+    for lat_offset in range(-lat_cells, lat_cells + 1):
+        for lng_offset in range(-lng_cells, lng_cells + 1):
+            # Calculate offset coordinates
+            offset_lat = center_lat + (lat_offset * lat_error)
+            offset_lng = center_lng + (lng_offset * lng_error)
+            
+            # Check if this offset is within the radius
+            distance = calculate_distance(center_lat, center_lng, offset_lat, offset_lng)
+            if distance <= radius_meters:
+                # Generate geohash for this offset
+                offset_geohash = encode_geohash(offset_lat, offset_lng, precision)
+                
+                # Add bounds for this geohash
+                bounds.append({
+                    "startHash": offset_geohash,
+                    "endHash": offset_geohash + "~"  # ~ is the last character in base32
+                })
+    
+    # Remove duplicates and sort
+    unique_bounds = []
+    seen = set()
+    for bound in bounds:
+        key = (bound["startHash"], bound["endHash"])
+        if key not in seen:
+            seen.add(key)
+            unique_bounds.append(bound)
+    
+    return unique_bounds
+
+
+def query_events_by_radius(
+    db, 
+    center_lat: float, 
+    center_lng: float, 
+    radius_meters: float,
+    collection_name: str = "events"
+) -> list:
+    """
+    Query events within a specified radius using geohash bounds.
+    
+    This function implements the Firebase geohash query pattern to efficiently
+    find events within a circular area, then filters out false positives.
     
     Args:
-        geohash: Base geohash string
+        db: Firestore client instance
+        center_lat: Center latitude
+        center_lng: Center longitude
+        radius_meters: Search radius in meters
+        collection_name: Name of the Firestore collection to query
         
     Returns:
-        List of neighboring geohash strings
+        List of event documents within the specified radius
     """
-    try:
-        return pgh.get_neighbors(geohash)
-    except Exception:
-        # Fallback implementation if pygeohash doesn't have get_neighbors
-        # This is a simplified version
-        neighbors = []
-        base32 = "0123456789bcdefghjkmnpqrstuvwxyz"
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from typing import List, Dict, Any
+    
+    # Get geohash query bounds
+    bounds = get_geohash_query_bounds(center_lat, center_lng, radius_meters)
+    
+    if not bounds:
+        return []
+    
+    # Execute queries for each bound
+    all_docs = []
+    
+    def execute_query(bound: Dict[str, str]) -> List[Any]:
+        """Execute a single geohash range query."""
+        try:
+            query = (db.collection(collection_name)
+                    .where("geohash", ">=", bound["startHash"])
+                    .where("geohash", "<=", bound["endHash"]))
+            
+            docs = list(query.stream())
+            return docs
+        except Exception as e:
+            print(f"Error executing query for bound {bound}: {e}")
+            return []
+    
+    # Execute all queries in parallel
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_bound = {executor.submit(execute_query, bound): bound for bound in bounds}
         
-        # For each direction, try to find the neighbor
-        # This is a basic implementation - for production use pygeohash's neighbors
-        for i in range(len(geohash)):
-            for j in range(len(base32)):
-                if base32[j] != geohash[i]:
-                    neighbor = geohash[:i] + base32[j] + geohash[i+1:]
-                    neighbors.append(neighbor)
-        
-        return neighbors[:8]  # Return up to 8 neighbors
+        for future in as_completed(future_to_bound.keys()):
+            docs = future.result()
+            all_docs.extend(docs)
+    
+    # Filter out false positives by calculating actual distance
+    matching_events = []
+    
+    for doc in all_docs:
+        try:
+            data = doc.to_dict()
+            
+            # Extract coordinates from the document
+            position = data.get("position")
+            if not position:
+                continue
+                
+            # Handle different position formats
+            if hasattr(position, 'latitude') and hasattr(position, 'longitude'):
+                # Firebase GeoPoint object
+                event_lat = position.latitude
+                event_lng = position.longitude
+            elif isinstance(position, dict):
+                # Dictionary with lat/lng or latitude/longitude keys
+                event_lat = position.get('latitude') or position.get('lat')
+                event_lng = position.get('longitude') or position.get('lng')
+            else:
+                continue
+                
+            if event_lat is None or event_lng is None:
+                continue
+            
+            # Calculate actual distance
+            distance = calculate_distance(center_lat, center_lng, event_lat, event_lng)
+            
+            # Only include if within radius
+            if distance <= radius_meters:
+                # Add distance to the document data for convenience
+                doc_data = data.copy()
+                doc_data['_distance_meters'] = round(distance, 2)
+                doc_data['_doc_id'] = doc.id
+                matching_events.append(doc_data)
+                
+        except Exception as e:
+            print(f"Error processing document {doc.id}: {e}")
+            continue
+    
+    # Sort by distance (closest first)
+    matching_events.sort(key=lambda x: x.get('_distance_meters', float('inf')))
+    
+    return matching_events

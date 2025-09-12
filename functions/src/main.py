@@ -14,7 +14,7 @@ from firebase_admin import initialize_app
 from .config.settings import settings
 from .utils.app_logging import get_logger
 from .auth import verify_token
-from .events import duplicate_event_associations, delete_event_associations, process_event_position
+from .events import duplicate_event_associations, delete_event_associations, process_event_position, search_events_by_radius
 from .reservations import (
     send_reservation_confirmation,
     check_reservation_expiration,
@@ -264,6 +264,56 @@ def on_user_created(event: Event[DocumentSnapshot | None]) -> https_fn.Response:
         
     except Exception as e:
         logger.error(f"Error in on_user_created: {str(e)}")
+        return https_fn.Response(f"Internal server error: {str(e)}", 500)
+
+
+@https_fn.on_request(region=settings.region)
+def search_events_nearby(req: https_fn.Request) -> https_fn.Response:
+    """
+    HTTP endpoint to search for events within a specified radius.
+    Requires authentication.
+    
+    Query parameters:
+    - lat: Center latitude (-90 to 90)
+    - lng: Center longitude (-180 to 180)
+    - radius: Search radius in meters (required)
+    - collection: Optional collection name (defaults to 'events')
+    """
+    try:
+        # Verify authentication
+        if not verify_token(req):
+            logger.warning("Unauthorized request to search_events_nearby")
+            return https_fn.Response("Unauthorized", 401)
+        
+        # Get query parameters
+        lat_str = req.args.get("lat")
+        lng_str = req.args.get("lng")
+        radius_str = req.args.get("radius")
+        collection_name = req.args.get("collection", "events")
+        
+        # Validate required parameters
+        if not lat_str:
+            return https_fn.Response("Missing required parameter: lat", 400)
+        if not lng_str:
+            return https_fn.Response("Missing required parameter: lng", 400)
+        if not radius_str:
+            return https_fn.Response("Missing required parameter: radius", 400)
+        
+        # Parse and validate parameters
+        try:
+            center_lat = float(lat_str)
+            center_lng = float(lng_str)
+            radius_meters = float(radius_str)
+        except ValueError as e:
+            return https_fn.Response(f"Invalid parameter format: {str(e)}", 400)
+        
+        logger.info(f"Searching events within {radius_meters}m of ({center_lat}, {center_lng})")
+        
+        # Search for events
+        return search_events_by_radius(center_lat, center_lng, radius_meters, collection_name)
+        
+    except Exception as e:
+        logger.error(f"Error in search_events_nearby: {str(e)}")
         return https_fn.Response(f"Internal server error: {str(e)}", 500)
 
 

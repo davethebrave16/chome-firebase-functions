@@ -11,7 +11,7 @@ from google.cloud.firestore_v1.document import DocumentReference
 
 from ..utils.firestore_client import get_firestore_client
 from ..utils.app_logging import get_logger
-from ..utils.geohash import encode_geohash
+from ..utils.geohash import encode_geohash, query_events_by_radius
 
 logger = get_logger(__name__)
 
@@ -327,6 +327,74 @@ class EventService:
         """Extract filename from file path."""
         return os.path.basename(file_path)
     
+    def search_events_by_radius(
+        self, 
+        center_lat: float, 
+        center_lng: float, 
+        radius_meters: float,
+        collection_name: str = "events"
+    ) -> https_fn.Response:
+        """
+        Search for events within a specified radius using geohash queries.
+        
+        Args:
+            center_lat: Center latitude (-90 to 90)
+            center_lng: Center longitude (-180 to 180)
+            radius_meters: Search radius in meters
+            collection_name: Name of the Firestore collection to query
+            
+        Returns:
+            HTTP response with matching events or error message
+        """
+        try:
+            # Validate input parameters
+            if not (-90 <= center_lat <= 90):
+                return https_fn.Response("Invalid latitude. Must be between -90 and 90.", 400)
+            
+            if not (-180 <= center_lng <= 180):
+                return https_fn.Response("Invalid longitude. Must be between -180 and 180.", 400)
+            
+            if radius_meters <= 0:
+                return https_fn.Response("Radius must be greater than 0 meters.", 400)
+            
+            if radius_meters > 1000000:  # 1000km limit
+                return https_fn.Response("Radius cannot exceed 1,000,000 meters (1000km).", 400)
+            
+            logger.info(f"Searching events within {radius_meters}m of ({center_lat}, {center_lng})")
+            
+            # Query events using geohash
+            matching_events = query_events_by_radius(
+                self.db, 
+                center_lat, 
+                center_lng, 
+                radius_meters,
+                collection_name
+            )
+            
+            logger.info(f"Found {len(matching_events)} events within radius")
+            
+            # Prepare response data
+            response_data = {
+                "center": {
+                    "latitude": center_lat,
+                    "longitude": center_lng
+                },
+                "radius_meters": radius_meters,
+                "total_events": len(matching_events),
+                "events": matching_events
+            }
+            
+            return https_fn.Response(response_data, 200)
+            
+        except ValueError as e:
+            error_msg = f"Invalid input parameters: {str(e)}"
+            logger.error(error_msg)
+            return https_fn.Response(error_msg, 400)
+        except Exception as e:
+            error_msg = f"Error searching events by radius: {str(e)}"
+            logger.error(error_msg)
+            return https_fn.Response(error_msg, 500)
+
     def process_event_position(self, doc_ref, position, event_id: str, context: str = "event") -> bool:
         """
         Process event position and update geohash field.
@@ -433,6 +501,32 @@ def delete_event_associations(
     except Exception as e:
         logger.error(f"Error in delete_event_associations: {str(e)}")
         return https_fn.Response(f"Error deleting event associations: {str(e)}", 500)
+
+
+def search_events_by_radius(
+    center_lat: float, 
+    center_lng: float, 
+    radius_meters: float,
+    collection_name: str = "events"
+) -> https_fn.Response:
+    """
+    Convenience function to search events within a specified radius.
+    
+    Args:
+        center_lat: Center latitude (-90 to 90)
+        center_lng: Center longitude (-180 to 180)
+        radius_meters: Search radius in meters
+        collection_name: Name of the Firestore collection to query
+        
+    Returns:
+        HTTP response with matching events or error message
+    """
+    try:
+        event_service = get_event_service()
+        return event_service.search_events_by_radius(center_lat, center_lng, radius_meters, collection_name)
+    except Exception as e:
+        logger.error(f"Error in search_events_by_radius: {str(e)}")
+        return https_fn.Response(f"Error searching events: {str(e)}", 500)
 
 
 def process_event_position(

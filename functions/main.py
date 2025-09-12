@@ -24,6 +24,7 @@ from src.main import (
     verify_reservation_expiration,
     on_reservation_created,
     on_user_created,
+    search_events_nearby,
 )
 
 # Re-export all functions for Firebase Functions
@@ -35,4 +36,5 @@ __all__ = [
     "verify_reservation_expiration",
     "on_reservation_created",
     "on_user_created",
+    "search_events_nearby",
 ]

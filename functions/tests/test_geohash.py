@@ -7,7 +7,7 @@ import os
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.utils.geohash import encode_geohash, decode_geohash, get_geohash_center, calculate_distance
+from src.utils.geohash import encode_geohash, calculate_distance
 
 def test_geohash_functions():
     """Test the geohash utility functions."""
@@ -22,17 +22,10 @@ def test_geohash_functions():
         geohash = encode_geohash(lat, lng, precision=10)
         print(f"✓ Encoded ({lat}, {lng}) to geohash: {geohash}")
         
-        # Test decoding
-        lat_min, lat_max, lng_min, lng_max = decode_geohash(geohash)
-        print(f"✓ Decoded geohash bounds: lat({lat_min:.6f}, {lat_max:.6f}), lng({lng_min:.6f}, {lng_max:.6f})")
-        
-        # Test center point
-        center_lat, center_lng = get_geohash_center(geohash)
-        print(f"✓ Geohash center: ({center_lat:.6f}, {center_lng:.6f})")
-        
-        # Test distance calculation
-        distance = calculate_distance(lat, lng, center_lat, center_lng)
-        print(f"✓ Distance from original to center: {distance:.2f} meters")
+        # Test distance calculation with known coordinates
+        milan_lat, milan_lng = 45.4642, 9.1900
+        distance = calculate_distance(lat, lng, milan_lat, milan_lng)
+        print(f"✓ Distance Rome-Milan: {distance:.0f} meters")
         
         # Test with different precision
         geohash_short = encode_geohash(lat, lng, precision=5)
