@@ -1,0 +1,21 @@
+meta {
+  name: get events nearby
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{host}}/search_events_nearby?lat=43.8369758&lng=10.4924641&radius=50000
+  body: none
+  auth: none
+}
+
+params:query {
+  lat: 43.8369758
+  lng: 10.4924641
+  radius: 50000
+}
+
+headers {
+  Authorization: {{token}}
+}
