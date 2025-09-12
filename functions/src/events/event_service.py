@@ -10,7 +10,8 @@ from firebase_admin import storage
 from google.cloud.firestore_v1.document import DocumentReference
 
 from ..utils.firestore_client import get_firestore_client
-from ..utils.logging import get_logger
+from ..utils.app_logging import get_logger
+from ..utils.geohash import encode_geohash, query_events_by_radius
 
 logger = get_logger(__name__)
 
@@ -325,6 +326,126 @@ class EventService:
     def _extract_filename(self, file_path: str) -> str:
         """Extract filename from file path."""
         return os.path.basename(file_path)
+    
+    def search_events_by_radius(
+        self, 
+        center_lat: float, 
+        center_lng: float, 
+        radius_meters: float,
+        collection_name: str = "events"
+    ) -> https_fn.Response:
+        """
+        Search for events within a specified radius using geohash queries.
+        
+        Args:
+            center_lat: Center latitude (-90 to 90)
+            center_lng: Center longitude (-180 to 180)
+            radius_meters: Search radius in meters
+            collection_name: Name of the Firestore collection to query
+            
+        Returns:
+            HTTP response with matching events or error message
+        """
+        try:
+            # Validate input parameters
+            if not (-90 <= center_lat <= 90):
+                return https_fn.Response("Invalid latitude. Must be between -90 and 90.", 400)
+            
+            if not (-180 <= center_lng <= 180):
+                return https_fn.Response("Invalid longitude. Must be between -180 and 180.", 400)
+            
+            if radius_meters <= 0:
+                return https_fn.Response("Radius must be greater than 0 meters.", 400)
+            
+            if radius_meters > 1000000:  # 1000km limit
+                return https_fn.Response("Radius cannot exceed 1,000,000 meters (1000km).", 400)
+            
+            logger.info(f"Searching events within {radius_meters}m of ({center_lat}, {center_lng})")
+            logger.info(f"Collection name: {collection_name}")
+
+            # Query events using geohash
+            matching_events = query_events_by_radius(
+                self.db, 
+                center_lat, 
+                center_lng, 
+                radius_meters,
+                collection_name
+            )
+            
+            logger.info(f"Found {len(matching_events)} events within radius")
+            
+            # Prepare response data
+            response_data = {
+                "center": {
+                    "latitude": center_lat,
+                    "longitude": center_lng
+                },
+                "radius_meters": radius_meters,
+                "total_events": len(matching_events),
+                "events": matching_events
+            }
+            
+            return https_fn.Response(response_data, 200)
+            
+        except ValueError as e:
+            error_msg = f"Invalid input parameters: {str(e)}"
+            logger.error(error_msg)
+            return https_fn.Response(error_msg, 400)
+        except Exception as e:
+            error_msg = f"Error searching events by radius: {str(e)}"
+            logger.error(error_msg)
+            return https_fn.Response(error_msg, 500)
+
+    def process_event_position(self, doc_ref, position, event_id: str, context: str = "event") -> bool:
+        """
+        Process event position and update geohash field.
+        
+        Args:
+            doc_ref: Document reference to update
+            position: Position data (GeoPoint or dict)
+            event_id: Event ID for logging
+            context: Context for logging (e.g., "new event", "event update")
+            
+        Returns:
+            True if geohash was successfully processed, False otherwise
+        """
+        if not position:
+            logger.info(f"{context} {event_id} has no position field, skipping geohash update")
+            return False
+        
+        try:
+            # Extract coordinates from position
+            if hasattr(position, 'latitude') and hasattr(position, 'longitude'):
+                # Firebase GeoPoint object
+                latitude = position.latitude
+                longitude = position.longitude
+            elif isinstance(position, dict):
+                # Dictionary with lat/lng or latitude/longitude keys
+                latitude = position.get('latitude') or position.get('lat')
+                longitude = position.get('longitude') or position.get('lng')
+            else:
+                logger.warning(f"Unsupported position format for {context} {event_id}: {type(position)}")
+                return False
+            
+            if latitude is None or longitude is None:
+                logger.warning(f"Missing latitude or longitude in position for {context} {event_id}: {position}")
+                return False
+            
+            # Generate geohash
+            geohash = encode_geohash(latitude, longitude, precision=10)
+            logger.info(f"Generated geohash '{geohash}' for {context} {event_id} at ({latitude}, {longitude})")
+            
+            # Update the document with the geohash
+            doc_ref.update({"geohash": geohash})
+            logger.info(f"Successfully updated geohash for {context} {event_id}")
+            return True
+            
+        except ValueError as e:
+            logger.error(f"Invalid coordinates for {context} {event_id}: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Error processing position for {context} {event_id}: {str(e)}")
+            return False
 
 
 # Global event service instance
@@ -381,3 +502,55 @@ def delete_event_associations(
     except Exception as e:
         logger.error(f"Error in delete_event_associations: {str(e)}")
         return https_fn.Response(f"Error deleting event associations: {str(e)}", 500)
+
+
+def search_events_by_radius(
+    center_lat: float, 
+    center_lng: float, 
+    radius_meters: float,
+    collection_name: str = "events"
+) -> https_fn.Response:
+    """
+    Convenience function to search events within a specified radius.
+    
+    Args:
+        center_lat: Center latitude (-90 to 90)
+        center_lng: Center longitude (-180 to 180)
+        radius_meters: Search radius in meters
+        collection_name: Name of the Firestore collection to query
+        
+    Returns:
+        HTTP response with matching events or error message
+    """
+    try:
+        event_service = get_event_service()
+        return event_service.search_events_by_radius(center_lat, center_lng, radius_meters, collection_name)
+    except Exception as e:
+        logger.error(f"Error in search_events_by_radius: {str(e)}")
+        return https_fn.Response(f"Error searching events: {str(e)}", 500)
+
+
+def process_event_position(
+    doc_ref, 
+    position, 
+    event_id: str, 
+    context: str = "event"
+) -> bool:
+    """
+    Convenience function to process event position and update geohash field.
+    
+    Args:
+        doc_ref: Document reference to update
+        position: Position data (GeoPoint or dict)
+        event_id: Event ID for logging
+        context: Context for logging (e.g., "new event", "event update")
+        
+    Returns:
+        True if geohash was successfully processed, False otherwise
+    """
+    try:
+        event_service = get_event_service()
+        return event_service.process_event_position(doc_ref, position, event_id, context)
+    except Exception as e:
+        logger.error(f"Error in process_event_position: {str(e)}")
+        return False

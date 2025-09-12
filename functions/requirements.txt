@@ -1,5 +1,5 @@
 # Firebase Functions dependencies
-firebase-functions==0.1.0
+firebase-functions==0.4.3
 firebase-admin==6.4.0
 
 # Google Cloud dependencies
@@ -14,3 +14,6 @@ python-dotenv==1.0.0
 
 # Type hints support
 typing-extensions==4.8.0
+
+# Geohash library for location-based queries
+pygeohash==3.2.0

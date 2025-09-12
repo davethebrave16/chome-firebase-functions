@@ -12,9 +12,9 @@ from firebase_functions.firestore_fn import (
 from firebase_admin import initialize_app
 
 from .config.settings import settings
-from .utils.logging import get_logger
+from .utils.app_logging import get_logger
 from .auth import verify_token
-from .events import duplicate_event_associations, delete_event_associations
+from .events import duplicate_event_associations, delete_event_associations, process_event_position, search_events_by_radius
 from .reservations import (
     send_reservation_confirmation,
     check_reservation_expiration,
@@ -26,6 +26,7 @@ app = initialize_app()
 
 # Get logger
 logger = get_logger(__name__)
+
 
 # Validate settings on startup
 try:
@@ -97,13 +98,17 @@ def on_event_created(event: Event[DocumentSnapshot | None]) -> https_fn.Response
         event_name = doc_data.get("name", "Unknown")
         logger.info(f"Event created: {doc_ref.id} with title '{event_name}'")
         
+        # Process geohash for all events (including duplicates)
+        position = doc_data.get("position")
+        process_event_position(doc_ref, position, doc_ref.id, "new event")
+        
         # Check if this is a duplicate event
         if "duplicateFrom" in doc_data and doc_data["duplicateFrom"] is not None:
             logger.info("Event duplication detected")
             return duplicate_event_associations(doc_data["duplicateFrom"], doc_ref)
         
-        logger.info("No actions needed for event creation")
-        return https_fn.Response("No actions needed", 204)
+        logger.info("Event creation processing completed")
+        return https_fn.Response("Event created successfully", 200)
         
     except Exception as e:
         logger.error(f"Error in on_event_created: {str(e)}")
@@ -259,4 +264,98 @@ def on_user_created(event: Event[DocumentSnapshot | None]) -> https_fn.Response:
         
     except Exception as e:
         logger.error(f"Error in on_user_created: {str(e)}")
+        return https_fn.Response(f"Internal server error: {str(e)}", 500)
+
+
+@https_fn.on_request(region=settings.region)
+def search_events_nearby(req: https_fn.Request) -> https_fn.Response:
+    """
+    HTTP endpoint to search for events within a specified radius.
+    Requires authentication.
+    
+    Query parameters:
+    - lat: Center latitude (-90 to 90)
+    - lng: Center longitude (-180 to 180)
+    - radius: Search radius in meters (required)
+    - collection: Optional collection name (defaults to 'event')
+    """
+    try:
+        # Verify authentication
+        if not verify_token(req):
+            logger.warning("Unauthorized request to search_events_nearby")
+            return https_fn.Response("Unauthorized", 401)
+        
+        # Get query parameters
+        lat_str = req.args.get("lat")
+        lng_str = req.args.get("lng")
+        radius_str = req.args.get("radius")
+        collection_name = req.args.get("collection", "event")
+        
+        # Validate required parameters
+        if not lat_str:
+            return https_fn.Response("Missing required parameter: lat", 400)
+        if not lng_str:
+            return https_fn.Response("Missing required parameter: lng", 400)
+        if not radius_str:
+            return https_fn.Response("Missing required parameter: radius", 400)
+        
+        # Parse and validate parameters
+        try:
+            center_lat = float(lat_str)
+            center_lng = float(lng_str)
+            radius_meters = float(radius_str)
+        except ValueError as e:
+            return https_fn.Response(f"Invalid parameter format: {str(e)}", 400)
+        
+        logger.info(f"Searching events within {radius_meters}m of ({center_lat}, {center_lng})")
+        
+        # Search for events
+        return search_events_by_radius(center_lat, center_lng, radius_meters, collection_name)
+        
+    except Exception as e:
+        logger.error(f"Error in search_events_nearby: {str(e)}")
+        return https_fn.Response(f"Internal server error: {str(e)}", 500)
+
+
+@on_document_updated(document='event/{event_id}', region=settings.region)
+def on_event_position_updated(event: Event[Change[DocumentSnapshot]]) -> https_fn.Response:
+    """
+    Triggered when an event document is updated.
+    Updates geohash field if position coordinates have changed.
+    """
+    try:
+        # Get the before and after document snapshots
+        before_snapshot = event.data.before
+        after_snapshot = event.data.after
+        
+        if not after_snapshot:
+            logger.error("Missing after document snapshot")
+            return https_fn.Response("Missing after document snapshot", 400)
+        
+        doc_ref = after_snapshot.reference
+        if not doc_ref:
+            logger.error("Missing document reference")
+            return https_fn.Response("Missing document reference", 400)
+        
+        # Get the before and after data to detect position changes
+        before_data = before_snapshot.to_dict() if before_snapshot else {}
+        after_data = after_snapshot.to_dict() if after_snapshot else {}
+        
+        # Check if position field has changed
+        before_position = before_data.get("position")
+        after_position = after_data.get("position")
+        
+        # Check if position has changed
+        if before_position == after_position:
+            logger.info(f"Event {doc_ref.id} position unchanged, skipping geohash update")
+            return https_fn.Response("Position unchanged", 200)
+        
+        # Process geohash if position exists and has changed
+        if process_event_position(doc_ref, after_position, doc_ref.id, "event update"):
+            return https_fn.Response("Geohash updated successfully", 200)
+        else:
+            return https_fn.Response("No position field found or invalid position", 200)
+            
+    except Exception as e:
+        logger.error(f"Error in on_event_position_updated: {str(e)}")
         return https_fn.Response(f"Internal server error: {str(e)}", 500)

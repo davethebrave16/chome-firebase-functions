@@ -4,7 +4,7 @@ from firebase_functions import https_fn
 from typing import Optional
 
 from ..config.settings import settings
-from ..utils.logging import get_logger
+from ..utils.app_logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -29,6 +29,8 @@ class AuthService:
             True if the token is valid, False otherwise
         """
         try:
+            # Debug: Log all headers
+            
             token = request.headers.get("Authorization")
             if not token:
                 logger.warning("No authorization token provided")
