@@ -357,12 +357,12 @@ firebase deploy --only functions
 ```bash
 cd functions
 source venv/bin/activate
-pytest tests/ -v
+python -m pytest tests/ -v
 ```
 
 ### Test Coverage
 ```bash
-pytest tests/ --cov=src --cov-report=html
+python -m pytest tests/ --cov=src --cov-report=html
 ```
 
 ### Available Tests
