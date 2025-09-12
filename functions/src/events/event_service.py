@@ -11,6 +11,7 @@ from google.cloud.firestore_v1.document import DocumentReference
 
 from ..utils.firestore_client import get_firestore_client
 from ..utils.logging import get_logger
+from ..utils.geohash import encode_geohash
 
 logger = get_logger(__name__)
 
@@ -325,6 +326,57 @@ class EventService:
     def _extract_filename(self, file_path: str) -> str:
         """Extract filename from file path."""
         return os.path.basename(file_path)
+    
+    def process_event_position(self, doc_ref, position, event_id: str, context: str = "event") -> bool:
+        """
+        Process event position and update geohash field.
+        
+        Args:
+            doc_ref: Document reference to update
+            position: Position data (GeoPoint or dict)
+            event_id: Event ID for logging
+            context: Context for logging (e.g., "new event", "event update")
+            
+        Returns:
+            True if geohash was successfully processed, False otherwise
+        """
+        if not position:
+            logger.info(f"{context} {event_id} has no position field, skipping geohash update")
+            return False
+        
+        try:
+            # Extract coordinates from position
+            if hasattr(position, 'latitude') and hasattr(position, 'longitude'):
+                # Firebase GeoPoint object
+                latitude = position.latitude
+                longitude = position.longitude
+            elif isinstance(position, dict):
+                # Dictionary with lat/lng or latitude/longitude keys
+                latitude = position.get('latitude') or position.get('lat')
+                longitude = position.get('longitude') or position.get('lng')
+            else:
+                logger.warning(f"Unsupported position format for {context} {event_id}: {type(position)}")
+                return False
+            
+            if latitude is None or longitude is None:
+                logger.warning(f"Missing latitude or longitude in position for {context} {event_id}: {position}")
+                return False
+            
+            # Generate geohash
+            geohash = encode_geohash(latitude, longitude, precision=10)
+            logger.info(f"Generated geohash '{geohash}' for {context} {event_id} at ({latitude}, {longitude})")
+            
+            # Update the document with the geohash
+            doc_ref.update({"geohash": geohash})
+            logger.info(f"Successfully updated geohash for {context} {event_id}")
+            return True
+            
+        except ValueError as e:
+            logger.error(f"Invalid coordinates for {context} {event_id}: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Error processing position for {context} {event_id}: {str(e)}")
+            return False
 
 
 # Global event service instance
@@ -381,3 +433,29 @@ def delete_event_associations(
     except Exception as e:
         logger.error(f"Error in delete_event_associations: {str(e)}")
         return https_fn.Response(f"Error deleting event associations: {str(e)}", 500)
+
+
+def process_event_position(
+    doc_ref, 
+    position, 
+    event_id: str, 
+    context: str = "event"
+) -> bool:
+    """
+    Convenience function to process event position and update geohash field.
+    
+    Args:
+        doc_ref: Document reference to update
+        position: Position data (GeoPoint or dict)
+        event_id: Event ID for logging
+        context: Context for logging (e.g., "new event", "event update")
+        
+    Returns:
+        True if geohash was successfully processed, False otherwise
+    """
+    try:
+        event_service = get_event_service()
+        return event_service.process_event_position(doc_ref, position, event_id, context)
+    except Exception as e:
+        logger.error(f"Error in process_event_position: {str(e)}")
+        return False
