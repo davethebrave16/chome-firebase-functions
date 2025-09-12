@@ -361,7 +361,8 @@ class EventService:
                 return https_fn.Response("Radius cannot exceed 1,000,000 meters (1000km).", 400)
             
             logger.info(f"Searching events within {radius_meters}m of ({center_lat}, {center_lng})")
-            
+            logger.info(f"Collection name: {collection_name}")
+
             # Query events using geohash
             matching_events = query_events_by_radius(
                 self.db, 

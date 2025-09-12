@@ -56,12 +56,12 @@ class TestGeohashQueryBounds:
         center_lat = 45.4642
         center_lng = 9.1900
         
-        # Test different radius ranges
+        # Test different radius ranges with updated precision logic
         test_cases = [
-            (50, 8),      # 50m -> precision 8
-            (500, 7),     # 500m -> precision 7
-            (5000, 6),    # 5km -> precision 6
-            (50000, 5),   # 50km -> precision 5
+            (50, 7),      # 50m -> precision 7
+            (500, 6),     # 500m -> precision 6
+            (5000, 5),    # 5km -> precision 5
+            (50000, 4),   # 50km -> precision 4 (changed from 5)
             (500000, 4),  # 500km -> precision 4
         ]
         

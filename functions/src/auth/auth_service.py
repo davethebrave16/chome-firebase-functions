@@ -29,6 +29,8 @@ class AuthService:
             True if the token is valid, False otherwise
         """
         try:
+            # Debug: Log all headers
+            
             token = request.headers.get("Authorization")
             if not token:
                 logger.warning("No authorization token provided")

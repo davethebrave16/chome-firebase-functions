@@ -277,7 +277,7 @@ def search_events_nearby(req: https_fn.Request) -> https_fn.Response:
     - lat: Center latitude (-90 to 90)
     - lng: Center longitude (-180 to 180)
     - radius: Search radius in meters (required)
-    - collection: Optional collection name (defaults to 'events')
+    - collection: Optional collection name (defaults to 'event')
     """
     try:
         # Verify authentication
@@ -289,7 +289,7 @@ def search_events_nearby(req: https_fn.Request) -> https_fn.Response:
         lat_str = req.args.get("lat")
         lng_str = req.args.get("lng")
         radius_str = req.args.get("radius")
-        collection_name = req.args.get("collection", "events")
+        collection_name = req.args.get("collection", "event")
         
         # Validate required parameters
         if not lat_str:

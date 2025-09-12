@@ -100,19 +100,19 @@ def get_geohash_query_bounds(center_lat: float, center_lng: float, radius_meters
         List of geohash bounds for querying, each with 'startHash' and 'endHash'
     """
     # Determine appropriate precision based on radius
-    # This follows the Firebase documentation recommendations
+    # Use a coarser precision to ensure we capture all relevant geohashes
     if radius_meters > 1000000:  # > 1000km
         precision = 3
     elif radius_meters > 100000:  # > 100km
         precision = 4
     elif radius_meters > 10000:   # > 10km
-        precision = 5
+        precision = 4  # Use precision 4 for 10km+ to ensure we capture all geohashes
     elif radius_meters > 1000:    # > 1km
-        precision = 6
+        precision = 5
     elif radius_meters > 100:     # > 100m
-        precision = 7
+        precision = 6
     else:
-        precision = 8
+        precision = 7
     
     # Calculate bounding box for the circular area
     # Convert radius from meters to degrees (approximate)
@@ -148,7 +148,7 @@ def get_geohash_query_bounds(center_lat: float, center_lng: float, radius_meters
         if distance <= radius_meters:
             filtered_geohashes.append(geohash)
     
-    # Convert to bounds format
+    # Convert to bounds format - use prefix matching for better coverage
     bounds = []
     for geohash in filtered_geohashes:
         bounds.append({
