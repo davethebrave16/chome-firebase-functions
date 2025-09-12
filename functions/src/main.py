@@ -12,7 +12,7 @@ from firebase_functions.firestore_fn import (
 from firebase_admin import initialize_app
 
 from .config.settings import settings
-from .utils.logging import get_logger
+from .utils.app_logging import get_logger
 from .auth import verify_token
 from .events import duplicate_event_associations, delete_event_associations, process_event_position
 from .reservations import (

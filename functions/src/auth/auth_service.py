@@ -4,7 +4,7 @@ from firebase_functions import https_fn
 from typing import Optional
 
 from ..config.settings import settings
-from ..utils.logging import get_logger
+from ..utils.app_logging import get_logger
 
 logger = get_logger(__name__)
 

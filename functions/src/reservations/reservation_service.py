@@ -10,8 +10,8 @@ from sqlite3.dbapi2 import Timestamp
 
 from ..config.settings import settings
 from ..utils.firestore_client import get_firestore_client
-from ..utils.logging import get_logger
-from ..email import send_reservation_confirmation_email
+from ..utils.app_logging import get_logger
+from ..email.email_service import send_reservation_confirmation_email
 
 logger = get_logger(__name__)
 

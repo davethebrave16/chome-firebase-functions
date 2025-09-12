@@ -9,6 +9,7 @@ A refactored Firebase Cloud Functions project built with Python following best p
 - **Event Duplication**: Clone events with all associated questions and media files
 - **Event Deletion**: Clean removal of events with automatic cleanup of associations
 - **Media Management**: Automatic file duplication and deletion in Google Cloud Storage
+- **Location Services**: Automatic geohash generation for location-based queries
 
 ### Reservation System
 - **Reservation Creation**: Automatic scheduling of expiration checks for new reservations
@@ -27,6 +28,12 @@ A refactored Firebase Cloud Functions project built with Python following best p
 - **Environment Configuration**: Centralized configuration management
 - **Input Validation**: Comprehensive input validation and sanitization
 
+### Location Services
+- **Geohash Generation**: Automatic geohash creation for event coordinates
+- **Location Queries**: Support for efficient location-based searches
+- **Coordinate Processing**: Handles both Firebase GeoPoint and dictionary formats
+- **Real-time Updates**: Automatic geohash updates when event positions change
+
 ## 🏗️ Project Structure
 
 ```
@@ -38,11 +45,12 @@ chome-firebase-functions/
 │   │   │   └── settings.py            # Environment variables & validation
 │   │   ├── utils/                     # Utility functions
 │   │   │   ├── firestore_client.py    # Firestore client management
-│   │   │   └── logging.py             # Structured logging
+│   │   │   ├── app_logging.py         # Structured logging
+│   │   │   └── geohash.py             # Geohash utilities for location queries
 │   │   ├── auth/                      # Authentication service
 │   │   │   └── auth_service.py        # Token verification
 │   │   ├── events/                    # Event management service
-│   │   │   └── event_service.py       # Event operations
+│   │   │   └── event_service.py       # Event operations & geohash processing
 │   │   ├── reservations/              # Reservation management service
 │   │   │   └── reservation_service.py # Reservation operations
 │   │   └── email/                     # Email service
@@ -92,6 +100,19 @@ chome-firebase-functions/
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
    ```
+
+## 📦 Dependencies
+
+### Core Dependencies
+- **firebase-functions**: Firebase Cloud Functions framework
+- **firebase-admin**: Firebase Admin SDK
+- **google-cloud-firestore**: Firestore database client
+- **pygeohash**: Geohash encoding/decoding for location queries
+
+### Additional Dependencies
+- **requests**: HTTP client for API calls
+- **python-dotenv**: Environment variable management
+- **typing-extensions**: Enhanced type hints support
 
 ## 🔧 Configuration
 
@@ -224,6 +245,29 @@ The project includes Bruno API documentation for testing endpoints:
   - Handles single name scenarios
   - Updates user document automatically
 
+### Location Services Functions
+
+#### `on_event_position_updated`
+- **Trigger**: Firestore document update
+- **Path**: `event/{event_id}`
+- **Purpose**: Automatically generates and updates geohash for location-based queries
+- **Features**:
+  - Detects changes to the `position` field
+  - Supports both Firebase GeoPoint and dictionary formats
+  - Generates 10-character precision geohash
+  - Updates document with `geohash` field
+  - Handles coordinate validation and error cases
+
+#### Geohash Processing (in `on_event_created`)
+- **Trigger**: Firestore document creation
+- **Path**: `event/{event_id}`
+- **Purpose**: Generates geohash for new events with position data
+- **Features**:
+  - Processes position data during event creation
+  - Works for both new events and duplicated events
+  - Automatic geohash generation and storage
+  - Supports efficient location-based queries
+
 ## 📧 Email Service Features
 
 ### Automatic Email Triggers
@@ -313,8 +357,19 @@ firebase deploy --only functions
 ```bash
 cd functions
 source venv/bin/activate
-pytest tests/
+pytest tests/ -v
 ```
+
+### Test Coverage
+```bash
+pytest tests/ --cov=src --cov-report=html
+```
+
+### Available Tests
+- **Authentication Tests**: Token verification and validation
+- **Geohash Tests**: Location encoding and decoding functionality
+- **Environment Tests**: Configuration validation
+- **Import Tests**: Module import verification
 
 ### Integration Testing
 - Use Bruno API documentation for endpoint testing

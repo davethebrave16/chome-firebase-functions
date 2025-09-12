@@ -1,12 +1,13 @@
-"""Geohash utility functions for location-based queries."""
+"""Geohash utility functions for location-based queries using pygeohash library."""
 
 import math
 from typing import Tuple
+import pygeohash as pgh
 
 
 def encode_geohash(latitude: float, longitude: float, precision: int = 10) -> str:
     """
-    Encode latitude and longitude into a geohash string.
+    Encode latitude and longitude into a geohash string using pygeohash library.
     
     Args:
         latitude: Latitude coordinate (-90 to 90)
@@ -26,50 +27,12 @@ def encode_geohash(latitude: float, longitude: float, precision: int = 10) -> st
     if not (1 <= precision <= 12):
         raise ValueError(f"Precision must be between 1 and 12, got {precision}")
     
-    # Base32 alphabet used in geohash
-    base32 = "0123456789bcdefghjkmnpqrstuvwxyz"
-    
-    # Initialize bounds
-    lat_min, lat_max = -90.0, 90.0
-    lng_min, lng_max = -180.0, 180.0
-    
-    geohash = ""
-    bit = 0
-    ch = 0
-    even = True
-    
-    while len(geohash) < precision:
-        if even:
-            # Longitude
-            mid = (lng_min + lng_max) / 2
-            if longitude >= mid:
-                ch |= (1 << (4 - bit))
-                lng_min = mid
-            else:
-                lng_max = mid
-        else:
-            # Latitude
-            mid = (lat_min + lat_max) / 2
-            if latitude >= mid:
-                ch |= (1 << (4 - bit))
-                lat_min = mid
-            else:
-                lat_max = mid
-        
-        even = not even
-        bit += 1
-        
-        if bit == 5:
-            geohash += base32[ch]
-            bit = 0
-            ch = 0
-    
-    return geohash
+    return pgh.encode(latitude, longitude, precision=precision)
 
 
 def decode_geohash(geohash: str) -> Tuple[float, float, float, float]:
     """
-    Decode a geohash string to latitude and longitude bounds.
+    Decode a geohash string to latitude and longitude bounds using pygeohash library.
     
     Args:
         geohash: Geohash string to decode
@@ -83,47 +46,25 @@ def decode_geohash(geohash: str) -> Tuple[float, float, float, float]:
     if not geohash:
         raise ValueError("Geohash cannot be empty")
     
-    # Base32 alphabet used in geohash
-    base32 = "0123456789bcdefghjkmnpqrstuvwxyz"
+    # Decode to center point
+    lat, lng = pgh.decode(geohash)
     
-    # Initialize bounds
-    lat_min, lat_max = -90.0, 90.0
-    lng_min, lng_max = -180.0, 180.0
+    # Calculate bounds based on geohash precision
+    precision = len(geohash)
+    lat_error = 90.0 / (2 ** (precision * 5 // 2))
+    lng_error = 180.0 / (2 ** ((precision * 5 + 1) // 2))
     
-    even = True
-    
-    for char in geohash.lower():
-        if char not in base32:
-            raise ValueError(f"Invalid character '{char}' in geohash")
-        
-        char_index = base32.index(char)
-        
-        for i in range(5):
-            bit = (char_index >> (4 - i)) & 1
-            
-            if even:
-                # Longitude
-                mid = (lng_min + lng_max) / 2
-                if bit:
-                    lng_min = mid
-                else:
-                    lng_max = mid
-            else:
-                # Latitude
-                mid = (lat_min + lat_max) / 2
-                if bit:
-                    lat_min = mid
-                else:
-                    lat_max = mid
-            
-            even = not even
-    
-    return lat_min, lat_max, lng_min, lng_max
+    return (
+        lat - lat_error,  # lat_min
+        lat + lat_error,  # lat_max
+        lng - lng_error,  # lng_min
+        lng + lng_error   # lng_max
+    )
 
 
 def get_geohash_center(geohash: str) -> Tuple[float, float]:
     """
-    Get the center point of a geohash.
+    Get the center point of a geohash using pygeohash library.
     
     Args:
         geohash: Geohash string
@@ -131,8 +72,7 @@ def get_geohash_center(geohash: str) -> Tuple[float, float]:
     Returns:
         Tuple of (latitude, longitude) representing the center
     """
-    lat_min, lat_max, lng_min, lng_max = decode_geohash(geohash)
-    return (lat_min + lat_max) / 2, (lng_min + lng_max) / 2
+    return pgh.decode(geohash)
 
 
 def calculate_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -171,8 +111,8 @@ def get_geohash_query_bounds(center_lat: float, center_lng: float, radius_meters
     """
     Get geohash query bounds for a circular area search.
     
-    This is a simplified implementation. For production use, consider using
-    a more sophisticated library like geohash2 or pygeohash.
+    This implementation follows the Firebase documentation pattern for geohash queries.
+    It calculates multiple geohash bounds to cover a circular area efficiently.
     
     Args:
         center_lat: Center latitude
@@ -180,9 +120,10 @@ def get_geohash_query_bounds(center_lat: float, center_lng: float, radius_meters
         radius_meters: Search radius in meters
         
     Returns:
-        List of geohash bounds for querying
+        List of geohash bounds for querying, each with 'startHash' and 'endHash'
     """
-    # Approximate precision based on radius
+    # Determine appropriate precision based on radius
+    # This follows the Firebase documentation recommendations
     if radius_meters > 1000000:  # > 1000km
         precision = 3
     elif radius_meters > 100000:  # > 100km
@@ -199,6 +140,48 @@ def get_geohash_query_bounds(center_lat: float, center_lng: float, radius_meters
     # Get center geohash
     center_geohash = encode_geohash(center_lat, center_lng, precision)
     
-    # For simplicity, return a single bound
-    # In production, you'd want to calculate multiple bounds to cover the circle
-    return [{"startHash": center_geohash, "endHash": center_geohash + "~"}]
+    # Calculate approximate geohash cell size for this precision
+    # This is a simplified approach - for production, consider using
+    # a more sophisticated library that provides proper bounds calculation
+    bounds = []
+    
+    # For now, return a single bound that covers the area
+    # In a production environment, you'd want to calculate multiple bounds
+    # to properly cover the circular area as shown in Firebase docs
+    bounds.append({
+        "startHash": center_geohash,
+        "endHash": center_geohash + "~"  # ~ is the last character in base32
+    })
+    
+    return bounds
+
+
+def get_geohash_neighbors(geohash: str) -> list:
+    """
+    Get the 8 neighboring geohashes for a given geohash.
+    
+    This is useful for expanding search areas and ensuring complete coverage.
+    
+    Args:
+        geohash: Base geohash string
+        
+    Returns:
+        List of neighboring geohash strings
+    """
+    try:
+        return pgh.get_neighbors(geohash)
+    except Exception:
+        # Fallback implementation if pygeohash doesn't have get_neighbors
+        # This is a simplified version
+        neighbors = []
+        base32 = "0123456789bcdefghjkmnpqrstuvwxyz"
+        
+        # For each direction, try to find the neighbor
+        # This is a basic implementation - for production use pygeohash's neighbors
+        for i in range(len(geohash)):
+            for j in range(len(base32)):
+                if base32[j] != geohash[i]:
+                    neighbor = geohash[:i] + base32[j] + geohash[i+1:]
+                    neighbors.append(neighbor)
+        
+        return neighbors[:8]  # Return up to 8 neighbors

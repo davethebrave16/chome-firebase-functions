@@ -10,7 +10,7 @@ from firebase_admin import storage
 from google.cloud.firestore_v1.document import DocumentReference
 
 from ..utils.firestore_client import get_firestore_client
-from ..utils.logging import get_logger
+from ..utils.app_logging import get_logger
 from ..utils.geohash import encode_geohash
 
 logger = get_logger(__name__)

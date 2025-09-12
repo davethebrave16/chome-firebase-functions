@@ -14,3 +14,6 @@ python-dotenv==1.0.0
 
 # Type hints support
 typing-extensions==4.8.0
+
+# Geohash library for location-based queries
+pygeohash==3.2.0
