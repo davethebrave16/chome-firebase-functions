@@ -63,7 +63,8 @@ chome-firebase-functions/
 ├── firebase.json                      # Firebase configuration
 ├── firestore.rules                    # Firestore security rules
 ├── firestore.indexes.json             # Firestore indexes
-└── storage.rules                      # Storage security rules
+├── storage.rules                      # Storage security rules
+└── cors.json                          # CORS configuration for Cloud Storage
 ```
 
 ## 🛠️ Prerequisites
@@ -156,6 +157,47 @@ FUNCTIONS_REGION=europe-west1
    - Cloud Storage
    - Cloud Functions
    - Cloud Tasks (for reservation expiration)
+
+### CORS Configuration for Cloud Storage
+
+To allow cross-origin requests to your Firebase Cloud Storage bucket, you need to configure CORS settings:
+
+1. **Configure CORS for your storage bucket**
+   ```bash
+   gsutil cors set cors.json gs://<your-cloud-storage-bucket>
+   ```
+
+2. **Verify CORS configuration**
+   ```bash
+   gsutil cors get gs://<your-cloud-storage-bucket>
+   ```
+
+3. **Current CORS configuration** (`cors.json`):
+   ```json
+   [
+     {
+       "origin": ["*"],
+       "method": ["GET"],
+       "maxAgeSeconds": 3600
+     }
+   ]
+   ```
+
+   This configuration allows:
+   - All origins (`*`) to make requests
+   - Only GET requests (for reading files)
+   - 1 hour cache for preflight requests
+
+4. **For production**, consider restricting origins:
+   ```json
+   [
+     {
+       "origin": ["https://yourdomain.com", "https://www.yourdomain.com"],
+       "method": ["GET", "POST", "PUT", "DELETE"],
+       "maxAgeSeconds": 3600
+     }
+   ]
+   ```
 
 ## 🚀 Development
 
