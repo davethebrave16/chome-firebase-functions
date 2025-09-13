@@ -13,6 +13,7 @@ from firebase_admin import initialize_app
 
 from .config.settings import settings
 from .utils.app_logging import get_logger
+from .utils.http_responses import json_error_response
 from .auth import verify_token
 from .events import duplicate_event_associations, delete_event_associations, process_event_position, search_events_by_radius
 from .reservations import (
@@ -271,7 +272,6 @@ def on_user_created(event: Event[DocumentSnapshot | None]) -> https_fn.Response:
 def search_events_nearby(req: https_fn.Request) -> https_fn.Response:
     """
     HTTP endpoint to search for events within a specified radius.
-    Requires authentication.
     
     Query parameters:
     - lat: Center latitude (-90 to 90)
@@ -280,11 +280,6 @@ def search_events_nearby(req: https_fn.Request) -> https_fn.Response:
     - collection: Optional collection name (defaults to 'event')
     """
     try:
-        # Verify authentication
-        if not verify_token(req):
-            logger.warning("Unauthorized request to search_events_nearby")
-            return https_fn.Response("Unauthorized", 401)
-        
         # Get query parameters
         lat_str = req.args.get("lat")
         lng_str = req.args.get("lng")
@@ -293,11 +288,11 @@ def search_events_nearby(req: https_fn.Request) -> https_fn.Response:
         
         # Validate required parameters
         if not lat_str:
-            return https_fn.Response("Missing required parameter: lat", 400)
+            return json_error_response("Missing required parameter: lat", 400)
         if not lng_str:
-            return https_fn.Response("Missing required parameter: lng", 400)
+            return json_error_response("Missing required parameter: lng", 400)
         if not radius_str:
-            return https_fn.Response("Missing required parameter: radius", 400)
+            return json_error_response("Missing required parameter: radius", 400)
         
         # Parse and validate parameters
         try:
@@ -305,7 +300,7 @@ def search_events_nearby(req: https_fn.Request) -> https_fn.Response:
             center_lng = float(lng_str)
             radius_meters = float(radius_str)
         except ValueError as e:
-            return https_fn.Response(f"Invalid parameter format: {str(e)}", 400)
+            return json_error_response(f"Invalid parameter format: {str(e)}", 400)
         
         logger.info(f"Searching events within {radius_meters}m of ({center_lat}, {center_lng})")
         
@@ -314,7 +309,7 @@ def search_events_nearby(req: https_fn.Request) -> https_fn.Response:
         
     except Exception as e:
         logger.error(f"Error in search_events_nearby: {str(e)}")
-        return https_fn.Response(f"Internal server error: {str(e)}", 500)
+        return json_error_response(f"Internal server error: {str(e)}", 500)
 
 
 @on_document_updated(document='event/{event_id}', region=settings.region)

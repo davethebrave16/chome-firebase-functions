@@ -1,8 +1,52 @@
 """Geohash utility functions for location-based queries using pygeohash library."""
 
 import math
-from typing import Tuple
+from typing import Tuple, Any, Dict
 import pygeohash as pgh
+from datetime import datetime
+
+
+def _convert_firestore_to_json_serializable(data: Any) -> Any:
+    """
+    Convert Firestore data types to JSON-serializable formats.
+    
+    Args:
+        data: Data to convert (can be dict, list, or primitive)
+        
+    Returns:
+        JSON-serializable data
+    """
+    if isinstance(data, dict):
+        return {key: _convert_firestore_to_json_serializable(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [_convert_firestore_to_json_serializable(item) for item in data]
+    elif hasattr(data, 'isoformat') and callable(getattr(data, 'isoformat')):
+        # Handle any datetime-like object with isoformat method
+        return data.isoformat()
+    elif isinstance(data, datetime):
+        # Convert to ISO format string
+        return data.isoformat()
+    elif hasattr(data, 'path') and hasattr(data, 'id'):
+        # Handle DocumentReference objects
+        return {
+            '_type': 'DocumentReference',
+            'id': data.id,
+            'path': data.path
+        }
+    elif hasattr(data, 'latitude') and hasattr(data, 'longitude'):
+        # Handle GeoPoint objects - convert to simple lat/lng dict
+        return {
+            'latitude': data.latitude,
+            'longitude': data.longitude
+        }
+    elif hasattr(data, 'id'):
+        # Handle other Firestore objects with id attribute
+        return {
+            '_type': type(data).__name__,
+            'id': data.id
+        }
+    else:
+        return data
 
 
 def encode_geohash(latitude: float, longitude: float, precision: int = 10) -> str:
@@ -301,6 +345,9 @@ def query_events_by_radius(
                 doc_data = data.copy()
                 doc_data['_distance_meters'] = round(distance, 2)
                 doc_data['_doc_id'] = doc.id
+                
+                # Convert Firestore data types to JSON-serializable format
+                doc_data = _convert_firestore_to_json_serializable(doc_data)
                 matching_events.append(doc_data)
                 
         except Exception as e:
