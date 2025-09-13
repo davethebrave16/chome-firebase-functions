@@ -341,14 +341,29 @@ def query_events_by_radius(
             
             # Only include if within radius
             if distance <= radius_meters:
-                # Add distance to the document data for convenience
-                doc_data = data.copy()
-                doc_data['_distance_meters'] = round(distance, 2)
-                doc_data['_doc_id'] = doc.id
+                # Filter to only include required fields: name, date, address, cover
+                filtered_data = {}
+                
+                # Add required fields if they exist
+                if 'name' in data:
+                    filtered_data['name'] = data['name']
+                if 'date' in data:
+                    filtered_data['date'] = data['date']
+                elif 'startDate' in data:
+                    # Use startDate as date if date field doesn't exist
+                    filtered_data['date'] = data['startDate']
+                if 'address' in data:
+                    filtered_data['address'] = data['address']
+                if 'cover' in data:
+                    filtered_data['cover'] = data['cover']
+                
+                # Add distance and doc_id for convenience
+                filtered_data['_distance_meters'] = round(distance, 2)
+                filtered_data['_doc_id'] = doc.id
                 
                 # Convert Firestore data types to JSON-serializable format
-                doc_data = _convert_firestore_to_json_serializable(doc_data)
-                matching_events.append(doc_data)
+                filtered_data = _convert_firestore_to_json_serializable(filtered_data)
+                matching_events.append(filtered_data)
                 
         except Exception as e:
             print(f"Error processing document {doc.id}: {e}")
