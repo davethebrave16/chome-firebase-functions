@@ -375,6 +375,36 @@ class EventService:
             
             logger.info(f"Found {len(matching_events)} events within radius")
             
+            # Log detailed information about each event
+            for i, event in enumerate(matching_events, 1):
+                event_id = event.get('_doc_id', 'Unknown ID')
+                event_name = event.get('name', 'Unknown Name')
+                distance = event.get('_distance_meters', 'Unknown')
+                address = event.get('address', 'No address available')
+                
+                logger.info(f"Event {i}: ID={event_id}, Name='{event_name}', Distance={distance}m, Address='{address}'")
+                
+                # Log additional event details if available
+                if 'description' in event:
+                    desc = event['description'][:100] + '...' if len(event['description']) > 100 else event['description']
+                    logger.info(f"  Description: {desc}")
+                
+                if 'startDate' in event:
+                    logger.info(f"  Start Date: {event['startDate']}")
+                
+                if 'endDate' in event:
+                    logger.info(f"  End Date: {event['endDate']}")
+                
+                # Log position info only if address is not available
+                if address == 'No address available':
+                    position = event.get('position', {})
+                    if isinstance(position, dict):
+                        lat = position.get('latitude', position.get('lat', 'Unknown'))
+                        lng = position.get('longitude', position.get('lng', 'Unknown'))
+                        logger.info(f"  Position: ({lat}, {lng})")
+                    elif hasattr(position, 'latitude') and hasattr(position, 'longitude'):
+                        logger.info(f"  Position: ({position.latitude}, {position.longitude})")
+            
             # Prepare response data
             response_data = {
                 "center": {
