@@ -12,6 +12,7 @@ from google.cloud.firestore_v1.document import DocumentReference
 from ..utils.firestore_client import get_firestore_client
 from ..utils.app_logging import get_logger
 from ..utils.geohash import encode_geohash, query_events_by_radius
+from ..utils.http_responses import json_response, json_error_response
 
 logger = get_logger(__name__)
 
@@ -349,16 +350,16 @@ class EventService:
         try:
             # Validate input parameters
             if not (-90 <= center_lat <= 90):
-                return https_fn.Response("Invalid latitude. Must be between -90 and 90.", 400)
+                return json_error_response("Invalid latitude. Must be between -90 and 90.", 400)
             
             if not (-180 <= center_lng <= 180):
-                return https_fn.Response("Invalid longitude. Must be between -180 and 180.", 400)
+                return json_error_response("Invalid longitude. Must be between -180 and 180.", 400)
             
             if radius_meters <= 0:
-                return https_fn.Response("Radius must be greater than 0 meters.", 400)
+                return json_error_response("Radius must be greater than 0 meters.", 400)
             
             if radius_meters > 1000000:  # 1000km limit
-                return https_fn.Response("Radius cannot exceed 1,000,000 meters (1000km).", 400)
+                return json_error_response("Radius cannot exceed 1,000,000 meters (1000km).", 400)
             
             logger.info(f"Searching events within {radius_meters}m of ({center_lat}, {center_lng})")
             logger.info(f"Collection name: {collection_name}")
@@ -385,16 +386,16 @@ class EventService:
                 "events": matching_events
             }
             
-            return https_fn.Response(response_data, 200)
+            return json_response(response_data, 200)
             
         except ValueError as e:
             error_msg = f"Invalid input parameters: {str(e)}"
             logger.error(error_msg)
-            return https_fn.Response(error_msg, 400)
+            return json_error_response(error_msg, 400)
         except Exception as e:
             error_msg = f"Error searching events by radius: {str(e)}"
             logger.error(error_msg)
-            return https_fn.Response(error_msg, 500)
+            return json_error_response(error_msg, 500)
 
     def process_event_position(self, doc_ref, position, event_id: str, context: str = "event") -> bool:
         """
@@ -527,7 +528,7 @@ def search_events_by_radius(
         return event_service.search_events_by_radius(center_lat, center_lng, radius_meters, collection_name)
     except Exception as e:
         logger.error(f"Error in search_events_by_radius: {str(e)}")
-        return https_fn.Response(f"Error searching events: {str(e)}", 500)
+        return json_error_response(f"Error searching events: {str(e)}", 500)
 
 
 def process_event_position(
