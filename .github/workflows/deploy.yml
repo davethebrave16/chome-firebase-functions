@@ -105,7 +105,7 @@ jobs:
           export PYTHONPATH="${PYTHONPATH}:$(pwd)/functions"
           export PYTHON_VERSION="3.12"
           # Use the virtual environment Python explicitly
-          firebase deploy --only functions --project "${{ secrets.FIREBASE_PROJECT_ID }}" --token "${{ secrets.FIREBASE_TOKEN }}" --force
+          firebase deploy --project "${{ secrets.FIREBASE_PROJECT_ID }}" --token "${{ secrets.FIREBASE_TOKEN }}" --force
 
       # 11. Verify deployment
       - name: Verify deployment
