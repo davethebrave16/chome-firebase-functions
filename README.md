@@ -89,12 +89,34 @@ chome-firebase-functions/
    npm install -g firebase-tools
    ```
 
-3. **Login to Firebase**
+3. **Install Google Cloud SDK**
+   ```bash
+   # Follow instructions at: https://cloud.google.com/sdk/docs/install
+   ```
+
+4. **Login to Firebase**
    ```bash
    firebase login
    ```
 
-4. **Set up Python environment**
+5. **Authenticate with gcloud (required for gsutil)**
+   ```bash
+   gcloud auth login
+   gcloud auth application-default login
+   ```
+   This will open your browser → choose the account with access to your Firebase project.
+
+6. **Verify you're using the correct project**
+   Find your project ID:
+   ```bash
+   firebase projects:list
+   ```
+   Then select it:
+   ```bash
+   gcloud config set project <PROJECT_ID>
+   ```
+
+7. **Set up Python environment**
    ```bash
    cd functions
    python3 -m venv venv
@@ -359,15 +381,33 @@ Before using custom sender domains, verify your domain in Brevo:
 
 ## 🚀 Deployment
 
-### Deploy Functions
+### Deploy Everything
 ```bash
-# Deploy all functions
+# Deploy all services (functions, firestore rules, firestore indexes, storage rules)
+firebase deploy
+```
+
+### Deploy Individual Services
+```bash
+# Deploy only Firebase Functions
 firebase deploy --only functions
+
+# Deploy only Firestore rules
+firebase deploy --only firestore:rules
+
+# Deploy only Firestore indexes
+firebase deploy --only firestore:indexes
+
+# Deploy only Storage rules
+firebase deploy --only storage
 
 # Deploy specific function
 firebase deploy --only functions:functionName
+```
 
-# Deploy with environment variables
+### Deploy with Environment Variables
+```bash
+# Set environment variables (if using Firebase Functions config)
 firebase functions:config:set secret.key="your_secret"
 firebase deploy --only functions
 ```
